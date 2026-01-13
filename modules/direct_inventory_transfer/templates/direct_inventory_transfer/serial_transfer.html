@@ -1,0 +1,461 @@
+{% extends "base.html" %}
+
+{% block title %}Serial Number Based Transfer{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-barcode"></i> Serial Number Based Transfer
+                    </h3>
+                    <div class="card-tools">
+                        <a href="{{ url_for('direct_inventory_transfer.index') }}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-arrow-left"></i> Back to List
+                        </a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Serial Number Search Form -->
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title">Step 1: Search by Serial Number</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="serialSearchForm">
+                                        <div class="form-group">
+                                            <label for="serial_number">Serial Number</label>
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" id="serial_number" name="serial_number" 
+                                                       placeholder="Enter or scan serial number" required>
+                                                <div class="input-group-append">
+                                                    <button type="submit" class="btn btn-primary">
+                                                        <i class="fas fa-search"></i> Search
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </form>
+                                    
+                                    <!-- Loading indicator -->
+                                    <div id="searchLoading" class="text-center" style="display: none;">
+                                        <i class="fas fa-spinner fa-spin"></i> Searching...
+                                    </div>
+                                    
+                                    <!-- Serial Location Results -->
+                                    <div id="serialLocationResults" style="display: none;">
+                                        <div class="alert alert-info">
+                                            <h6><i class="fas fa-info-circle"></i> Serial Number Location Found</h6>
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <strong>Item Code:</strong> <span id="result_item_code"></span><br>
+                                                    <strong>Item Name:</strong> <span id="result_item_name"></span><br>
+                                                    <strong>Serial Number:</strong> <span id="result_serial_number"></span>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <strong>From Warehouse:</strong> <span id="result_from_warehouse"></span><br>
+                                                    <strong>From Bin:</strong> <span id="result_from_bin"></span><br>
+                                                    <strong>Branch:</strong> <span id="result_branch"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Error display -->
+                                    <div id="searchError" class="alert alert-danger" style="display: none;">
+                                        <i class="fas fa-exclamation-triangle"></i> <span id="errorMessage"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Transfer History -->
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title">Recent Transfers</h5>
+                                </div>
+                                <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                                    <div id="transferHistory">
+                                        <div class="text-center">
+                                            <i class="fas fa-spinner fa-spin"></i> Loading...
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Transfer Form -->
+                    <div class="row mt-4" id="transferFormSection" style="display: none;">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5 class="card-title">Step 2: Select Destination & Transfer</h5>
+                                </div>
+                                <div class="card-body">
+                                    <form id="transferForm">
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label for="to_warehouse">To Warehouse *</label>
+                                                    <select class="form-control" id="to_warehouse" name="to_warehouse" required>
+                                                        <option value="">Select Destination Warehouse</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <div class="form-group">
+                                                    <label for="to_bin">To Bin Location</label>
+                                                    <select class="form-control" id="to_bin" name="to_bin">
+                                                        <option value="">Select Destination Bin (Optional)</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="form-group">
+                                            <label for="comments">Comments</label>
+                                            <textarea class="form-control" id="comments" name="comments" rows="3" 
+                                                      placeholder="Optional transfer comments"></textarea>
+                                        </div>
+                                        
+                                        <div class="form-group">
+                                            <button type="submit" class="btn btn-success btn-lg">
+                                                <i class="fas fa-exchange-alt"></i> Post Stock Transfer
+                                            </button>
+                                            <button type="button" class="btn btn-secondary btn-lg ml-2" onclick="resetForm()">
+                                                <i class="fas fa-redo"></i> Reset
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-check-circle"></i> Transfer Successful
+                </h5>
+            </div>
+            <div class="modal-body">
+                <p><strong>Transfer Number:</strong> <span id="success_transfer_number"></span></p>
+                <p><strong>SAP Document Number:</strong> <span id="success_sap_doc"></span></p>
+                <p class="text-success">The stock transfer has been posted successfully to SAP B1.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" onclick="resetForm(); $('#successModal').modal('hide');">
+                    Create Another Transfer
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let serialLocationData = {};
+
+$(document).ready(function() {
+    console.log('Serial transfer page loaded');
+    loadWarehouses();
+    loadTransferHistory();
+    
+    // Auto-focus on serial number input
+    $('#serial_number').focus();
+    
+    // Handle Enter key in serial number input
+    $('#serial_number').on('keypress', function(e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            $('#serialSearchForm').submit();
+        }
+    });
+});
+
+// Load warehouses for destination selection
+function loadWarehouses() {
+    console.log('Loading warehouses...');
+    $.get('/direct-inventory-transfer/api/get-warehouses')
+        .done(function(response) {
+            console.log('Warehouse response:', response);
+            if (response.success && response.warehouses) {
+                const select = $('#to_warehouse');
+                select.empty().append('<option value="">Select Destination Warehouse</option>');
+                
+                response.warehouses.forEach(function(warehouse) {
+                    select.append(`<option value="${warehouse.WarehouseCode}">${warehouse.WarehouseCode} - ${warehouse.WarehouseName}</option>`);
+                });
+                console.log(`Loaded ${response.warehouses.length} warehouses`);
+            } else {
+                console.error('Invalid warehouse response:', response);
+            }
+        })
+        .fail(function(xhr, status, error) {
+            console.error('Failed to load warehouses:', error);
+            console.error('Status:', status);
+            console.error('Response:', xhr.responseText);
+        });
+}
+
+// Load bin locations when warehouse is selected
+$('#to_warehouse').on('change', function() {
+    const warehouseCode = $(this).val();
+    const binSelect = $('#to_bin');
+    
+    console.log('Warehouse selected:', warehouseCode);
+    binSelect.empty().append('<option value="">Select Destination Bin (Optional)</option>');
+    
+    if (warehouseCode) {
+        console.log('Loading bins for warehouse:', warehouseCode);
+        $.get('/direct-inventory-transfer/api/get-bin-locations', { warehouse_code: warehouseCode })
+            .done(function(response) {
+                console.log('Bin response:', response);
+                if (response.success && response.bins) {
+                    response.bins.forEach(function(bin) {
+                        binSelect.append(`<option value="${bin.BinCode}">${bin.BinCode}</option>`);
+                    });
+                    console.log(`Loaded ${response.bins.length} bins`);
+                } else {
+                    console.error('Invalid bin response:', response);
+                }
+            })
+            .fail(function(xhr, status, error) {
+                console.error('Failed to load bins:', error);
+                console.error('Status:', status);
+                console.error('Response:', xhr.responseText);
+            });
+    }
+});
+
+// Handle serial number search
+$('#serialSearchForm').on('submit', function(e) {
+    e.preventDefault();
+    
+    const serialNumber = $('#serial_number').val().trim();
+    if (!serialNumber) {
+        showError('Please enter a serial number');
+        return;
+    }
+    
+    searchSerialLocation(serialNumber);
+});
+
+function searchSerialLocation(serialNumber) {
+    $('#searchLoading').show();
+    $('#serialLocationResults').hide();
+    $('#searchError').hide();
+    $('#transferFormSection').hide();
+    
+    $.get('/direct-inventory-transfer/api/get-serial-location', { serial_number: serialNumber })
+        .done(function(response) {
+            $('#searchLoading').hide();
+            
+            if (response.success && response.value && response.value.length > 0) {
+                const location = response.value[0];
+                serialLocationData = location;
+                
+                // Display results
+                $('#result_item_code').text(location.ItemCode);
+                $('#result_item_name').text(location.itemName);
+                $('#result_serial_number').text(location.DistNumber);
+                $('#result_from_warehouse').text(`${location.WhsCode} - ${location.WhsName}`);
+                $('#result_branch').text(`${location.BPLName} (ID: ${location.BPLid})`);
+                
+                // Get bin code if BinAbsEntry is available
+                if (location.BinAbsEntry) {
+                    getBinCode(location.BinAbsEntry);
+                } else {
+                    $('#result_from_bin').text('Not specified');
+                    showTransferForm();
+                }
+            } else {
+                showError('Serial number not found or no location data available');
+            }
+        })
+        .fail(function(xhr) {
+            $('#searchLoading').hide();
+            const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : 'Failed to search serial location';
+            showError(errorMsg);
+        });
+}
+
+function getBinCode(binAbsEntry) {
+    $.get('/direct-inventory-transfer/api/get-bin-code', { abs_entry: binAbsEntry })
+        .done(function(response) {
+            if (response.success && response.value && response.value.length > 0) {
+                const binData = response.value[0];
+                $('#result_from_bin').text(binData.BinCode);
+                serialLocationData.FromBinCode = binData.BinCode;
+            } else {
+                $('#result_from_bin').text('Not found');
+            }
+            showTransferForm();
+        })
+        .fail(function() {
+            $('#result_from_bin').text('Error loading bin');
+            showTransferForm();
+        });
+}
+
+function showTransferForm() {
+    $('#serialLocationResults').show();
+    $('#transferFormSection').show();
+    
+    // Remove the source warehouse from destination options
+    const sourceWarehouse = serialLocationData.WhsCode;
+    $('#to_warehouse option').each(function() {
+        if ($(this).val() === sourceWarehouse) {
+            $(this).prop('disabled', true).text($(this).text() + ' (Source - Cannot Select)');
+        } else {
+            $(this).prop('disabled', false);
+        }
+    });
+}
+
+// Handle transfer form submission
+$('#transferForm').on('submit', function(e) {
+    e.preventDefault();
+    
+    const toWarehouse = $('#to_warehouse').val();
+    const toBin = $('#to_bin').val();
+    const comments = $('#comments').val();
+    
+    if (!toWarehouse) {
+        showError('Please select a destination warehouse');
+        return;
+    }
+    
+    if (toWarehouse === serialLocationData.WhsCode) {
+        showError('Destination warehouse must be different from source warehouse');
+        return;
+    }
+    
+    const transferData = {
+        serial_number: serialLocationData.DistNumber,
+        item_code: serialLocationData.ItemCode,
+        item_name: serialLocationData.itemName,
+        from_warehouse: serialLocationData.WhsCode,
+        to_warehouse: toWarehouse,
+        from_bin_code: serialLocationData.FromBinCode || '',
+        to_bin_code: toBin || '',
+        branch_id: serialLocationData.BPLid,
+        comments: comments || `Serial transfer for ${serialLocationData.DistNumber}`
+    };
+    
+    postStockTransfer(transferData);
+});
+
+function postStockTransfer(transferData) {
+    const submitBtn = $('#transferForm button[type="submit"]');
+    const originalText = submitBtn.html();
+    
+    submitBtn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Posting...');
+    
+    $.ajax({
+        url: '/direct-inventory-transfer/api/post-serial-stock-transfer',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(transferData),
+        success: function(response) {
+            if (response.success) {
+                $('#success_transfer_number').text(response.transfer_number);
+                $('#success_sap_doc').text(response.sap_doc_number);
+                $('#successModal').modal('show');
+                loadTransferHistory(); // Refresh history
+            } else {
+                showError(response.error || 'Transfer failed');
+            }
+        },
+        error: function(xhr) {
+            const errorMsg = xhr.responseJSON ? xhr.responseJSON.error : 'Transfer failed';
+            showError(errorMsg);
+        },
+        complete: function() {
+            submitBtn.prop('disabled', false).html(originalText);
+        }
+    });
+}
+
+function loadTransferHistory() {
+    $.get('/direct-inventory-transfer/api/history')
+        .done(function(response) {
+            if (response.success) {
+                displayTransferHistory(response.transfers);
+            }
+        })
+        .fail(function() {
+            $('#transferHistory').html('<div class="text-muted">Failed to load history</div>');
+        });
+}
+
+function displayTransferHistory(transfers) {
+    const historyDiv = $('#transferHistory');
+    
+    if (transfers.length === 0) {
+        historyDiv.html('<div class="text-muted">No recent transfers</div>');
+        return;
+    }
+    
+    let html = '';
+    transfers.slice(0, 10).forEach(function(transfer) {
+        const statusClass = transfer.status === 'posted' ? 'success' : 
+                           transfer.status === 'rejected' ? 'danger' : 'warning';
+        
+        html += `
+            <div class="border-bottom pb-2 mb-2">
+                <div class="d-flex justify-content-between">
+                    <small class="font-weight-bold">${transfer.transfer_number}</small>
+                    <span class="badge badge-${statusClass}">${transfer.status}</span>
+                </div>
+                <div class="text-muted small">
+                    ${transfer.item_code} (Qty: ${transfer.quantity})<br>
+                    ${transfer.from_warehouse} → ${transfer.to_warehouse}
+                    ${transfer.sap_document_number ? `<br>SAP: ${transfer.sap_document_number}` : ''}
+                </div>
+            </div>
+        `;
+    });
+    
+    historyDiv.html(html);
+}
+
+function showError(message) {
+    $('#errorMessage').text(message);
+    $('#searchError').show();
+}
+
+function resetForm() {
+    $('#serialSearchForm')[0].reset();
+    $('#transferForm')[0].reset();
+    $('#serialLocationResults').hide();
+    $('#transferFormSection').hide();
+    $('#searchError').hide();
+    $('#serial_number').focus();
+    serialLocationData = {};
+    
+    // Re-enable all warehouse options
+    $('#to_warehouse option').prop('disabled', false).each(function() {
+        const text = $(this).text();
+        if (text.includes(' (Source - Cannot Select)')) {
+            $(this).text(text.replace(' (Source - Cannot Select)', ''));
+        }
+    });
+}
+</script>
+{% endblock %}

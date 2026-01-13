@@ -1,0 +1,99 @@
+# Warehouse Management System (WMS)
+
+## Overview
+A Flask-based Warehouse Management System (WMS) designed to streamline inventory operations by integrating seamlessly with SAP. The system focuses on enhancing efficiency, accuracy, and control over warehouse logistics through functionalities such as barcode scanning, goods receipt, pick list generation, and inventory transfers. It aims to minimize manual errors and maximize throughput for small to medium-sized enterprises by providing real-time data synchronization with SAP. The project's ambition is to provide a robust, scalable, and user-friendly solution for modern warehouse management challenges, leveraging existing SAP infrastructure while introducing advanced features for operational excellence.
+
+## User Preferences
+*   Keep MySQL migration files updated when database schema changes occur
+*   SQL query validation should only run on initial startup, not on every application restart
+
+## System Architecture
+The system is built on a Flask web application backend, utilizing Jinja2 for server-side rendering. A core architectural decision is the deep integration with the SAP B1 Service Layer API for all critical warehouse operations, ensuring data consistency and real-time updates. PostgreSQL is the primary database target for cloud deployments, with SQLite serving as a fallback. User authentication uses Flask-Login with robust role-based access control. The application is designed for production deployment using Gunicorn with autoscale capabilities.
+
+**UI/UX Decisions:**
+*   Intuitive workflows for managing inventory, including serial number transfers and real-time validation against SAP B1.
+*   Dynamic dropdowns for bin locations, populated from SAP B1.
+*   Enhanced GRPO workflow with read-only warehouse fields automatically populated from Purchase Order data.
+*   Comprehensive pagination, filtering, and search functionalities across key modules.
+*   QR code labels in the Multi-GRN module now include Bin Location information.
+
+**Technical Implementations:**
+*   **SAP B1 Integration:** Utilizes a dedicated `SAPMultiGRNService` class for secure and robust communication with the SAP B1 Service Layer, including SSL/TLS verification and optimized OData filtering. Conditional handling of batch/serial numbers in SAP JSON prevents API errors.
+*   **Modular Design:** New features are implemented as modular blueprints with their own templates and services, using absolute template paths for PyInstaller compatibility.
+*   **Frontend:** Jinja2 templating with JavaScript libraries like Select2 for enhanced UI components.
+*   **Error Handling:** Comprehensive validation and error logging for API communications and user inputs.
+*   **Optimized SAP SQL Query Validation:** SQL query validation runs only on initial startup using a flag-based system.
+*   **Database Migrations:** A comprehensive MySQL migration tracking system is in place for schema changes, complementing the primary PostgreSQL strategy.
+*   **GRPO Integer Quantity Distribution:** Implements intelligent integer quantity distribution per pack, ensuring no decimal quantities on QR labels.
+*   **Persistent QR Scan State:** Uses a database-backed `TransferScanState` model for persistent pack tracking during inventory transfers, avoiding session limitations.
+*   **Inventory Transfer QR-Driven Batch Scanning**: Supports camera-based QR scanning that automatically populates batch numbers, bin locations, and quantities from Multi-GRN QR codes, with multi-batch support and quantity accumulation.
+*   **SAP B1 Transfer Request Persistent Storage**: Stores SAP B1 Transfer Request data locally in the database for later posting and improved reliability.
+
+**Feature Specifications:**
+*   **User Management:** Comprehensive authentication, role-based access, and self-service profile management.
+*   **GRPO Management:** Standard Goods Receipt PO processing, intelligent batch/serial field management, and a multi-GRN module for batch creation from multiple Purchase Orders via a 5-step workflow with SAP B1 integration and QR label generation. Includes dynamic SAP bin location lookup, QC workflow with line-by-line verification, unique QR identifiers per pack, and editing of draft batches.
+*   **Inventory Transfer:** Enhanced module for creating inventory transfer requests with document series selection, SAP B1 validation, and robust QR label scanning with duplicate prevention and quantity accumulation.
+*   **Direct Inventory Transfer:** Barcode-based inventory transfer module with automatic serial/batch detection, real-time SAP B1 validation, warehouse and bin selection, QC approval workflow, and direct posting to SAP B1 as StockTransfers. Includes camera-based scanning.
+*   **Sales Order Against Delivery:** Module for creating Delivery Notes against Sales Orders with SAP B1 integration, including SO series selection, cascading dropdown for open SO document numbers, item picking with batch/serial validation, and individual QR code label generation.
+*   **Pick List Management:** Generation and processing of pick lists.
+*   **Barcode Scanning:** Integrated camera-based scanning for various modules.
+*   **Inventory Counting:** SAP B1 integrated inventory counting with local database storage for tracking, audit trails, user tracking, and timestamps, including a comprehensive history view.
+*   **Branch Management:** Functionality for managing different warehouse branches.
+*   **Quality Control Dashboard:** Provides a unified oversight for quality approval workflows across Multi GRN, Direct Transfer, and Sales Delivery modules, with SAP B1 posting integration upon approval.
+*   **SO Against Invoice Module:** Allows creating invoices against existing Sales Orders with SAP B1 integration, including SO series selection, SO number validation, and item validation.
+*   **Item Tracking Module:** Serial number tracking module that fetches transaction history from SAP B1 using the 'item_tracking' SQL Query. Supports manual entry and QR code scanning, displays document type names (GRPO, Delivery, Invoice, Transfer, etc.) with complete SAP B1 DocType mapping.
+
+## Recent Changes (December 15, 2025)
+*   **Inventory Transfer Multi-Batch Support Enhancement:** Enhanced the duplicate prevention logic to support transferring the same item code with different batch numbers:
+    - Previously: Same item code was blocked regardless of batch number
+    - Now: Same Item Code + Same Batch → Blocked (correct duplicate prevention)
+    - Now: Same Item Code + Different Batch → Allowed (enables multi-batch transfers)
+    - Added normalized batch comparison (trim + uppercase) for consistent matching
+    - Handles whitespace variations and case differences in batch numbers
+    - MySQL migration: `migrations/mysql/changes/2025-12-15_inventory_transfer_batch_duplicate_fix.md`
+
+## Recent Changes (December 11, 2025)
+*   **Inventory Counting History View Enhancement:** Fixed issue where line items were not displayed when clicking "View" button:
+    - Created new API endpoint `/api/get-local-invcnt-details` to fetch document details from local database
+    - Updated history page to show modal with document info and line items table
+    - Added eager loading with `joinedload()` to properly display line counts in history table
+    - Line items table shows: Item Code, Description, Warehouse, System Qty, Counted Qty, Variance, Counted status
+    - "Open in SAP Counting" button allows navigation to full SAP counting interface
+    - History now maintained even after posting to SAP B1 (documents become Closed but local data preserved)
+    - MySQL migration: `migrations/mysql/changes/2025-12-11_inventory_counting_history_view.sql`
+
+## Recent Changes (December 10, 2025)
+*   **Item Tracking Module:** New module for tracking items by serial number with SAP B1 integration:
+    - URL: `/item-tracking/`
+    - Uses SAP SQL Query 'item_tracking' for fetching serial number history
+    - Displays SAP B1 DocType as human-readable document names (e.g., DocType 20 = "Goods Receipt PO")
+    - Supports camera-based QR code scanning and manual serial number entry
+    - Complete DocType mapping including GRPO, Delivery, Invoice, Transfer, Production Order, etc.
+    - Added 'item_tracking' permission for admin, manager, and user roles
+    - MySQL migration: `migrations/mysql/changes/2025-12-10_item_tracking_module.sql`
+
+## Recent Changes (December 8, 2025)
+*   **Multi GRN Workflow Optimization - Skip Step 2:** Modified the Multi GRN creation workflow to skip the redundant PO selection screen (Step 2). Now when users select CardCode and POs in the modal, clicking "Next: Select Lines" goes directly to Step 3 (Line Selection) instead of showing another PO selection page. PO links are now added directly in the `create_grn_from_modal` route, and line items are fetched using the SAP B1 $crossjoin method for efficient DocEntry-based line number selection.
+
+## Recent Changes (December 6, 2025)
+*   **Multi GRN CardCode Dropdown Fix:** Enhanced SAP B1 data fetching methods with mock data fallback for offline testing:
+    - `fetch_customers_from_open_pos()` - Now uses mock data when SAP is unavailable
+    - `fetch_cardcode_by_series()` - Added Series filter, deduplication by CardCode, and mock data fallback
+    - `fetch_pos_by_cardcode()` - Added mock data fallback
+    - `fetch_po_lines_by_docentry()` - Updated to use SAP B1 $crossjoin URL format with mock data fallback
+*   **$crossjoin URL Implementation:** PO line items are now fetched using the SAP B1 $crossjoin endpoint format for better data retrieval
+
+## Recent Changes (December 5, 2025)
+*   **Multi GRN CSRF Token Fix:** Removed `{{ csrf_token() }}` from `modules/multi_grn_creation/templates/multi_grn/index.html` - CSRF protection is disabled globally in this application, and all modules are consistent in not requiring CSRF tokens.
+
+## Technical Notes
+*   **CSRF Protection:** CSRF protection is intentionally disabled globally across all modules. Do not add `{{ csrf_token() }}` to templates unless Flask-WTF CSRFProtect is initialized in `app.py`.
+*   **MySQL Warnings:** MySQL connection warnings are expected in Replit environment - the app operates in PostgreSQL-only mode.
+*   **Credential Fallback:** The app gracefully falls back to environment variables when `credential.json` is not found.
+
+## External Dependencies
+*   **SAP B1 Service Layer API**: For all core inventory and document management functionalities (GRPO, pick lists, inventory transfers, serial numbers, business partners, inventory counts).
+*   **PostgreSQL**: Primary relational database for production environments.
+*   **SQLite**: Local relational database for development and initial setup.
+*   **Gunicorn**: WSGI HTTP server for deploying the Flask application in production.
+*   **Flask-Login**: Library for managing user sessions and authentication.
