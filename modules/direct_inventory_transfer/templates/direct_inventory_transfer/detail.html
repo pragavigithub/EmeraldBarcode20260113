@@ -75,57 +75,42 @@
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h6 class="m-0 font-weight-bold text-primary">
-                <i class="fas fa-barcode"></i> Scan Barcode / Enter Item Code
+                <i class="fas fa-barcode"></i> Step 1: Scan Barcode / Enter Serial Number
             </h6>
         </div>
         <div class="card-body">
             <form id="addItemForm">
                 <div class="row">
                     <div class="col-md-4 mb-3">
-                        <label for="item_code" class="form-label">Barcode / Item Code <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="item_code" name="item_code" 
-                               placeholder="Scan or enter item code" autofocus required>
-                        <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="validateItem()">
-                            <i class="fas fa-search"></i> Validate Item
-                        </button>
+                        <label for="serial_number_search" class="form-label">Serial Number <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="serial_number_search" name="serial_number_search" 
+                                   placeholder="Scan or enter serial number" autofocus required>
+                            <button type="button" class="btn btn-primary" id="btnSearchSerial">
+                                <i class="fas fa-search"></i> Search
+                            </button>
+                        </div>
+                        <small class="text-muted">Enter serial number to fetch item details</small>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="form-label">Item Description</label>
-                        <input type="text" class="form-control" id="item_description" readonly>
+                        <input type="text" class="form-control" id="item_description_display" readonly>
                     </div>
                     <div class="col-md-2 mb-3">
-                        <label class="form-label">Item Type</label>
-                        <input type="text" class="form-control" id="item_type_display" readonly>
-                        <input type="hidden" id="item_type" name="item_type">
+                        <label class="form-label">Item Code</label>
+                        <input type="text" class="form-control" id="item_code_display" readonly>
+                        <input type="hidden" id="item_code" name="item_code">
+                        <input type="hidden" id="item_type" name="item_type" value="serial">
                     </div>
                     <div class="col-md-2 mb-3">
                         <label for="quantity" class="form-label">Quantity</label>
                         <input type="number" class="form-control" id="quantity" name="quantity" 
-                               value="1" min="1" step="1">
-                    </div>
-                </div>
-
-                <!-- Serial Numbers Section (shown only for serial items) -->
-                <div id="serialSection" class="row" style="display: none;">
-                    <div class="col-md-12 mb-3">
-                        <label for="serial_numbers" class="form-label">Serial Numbers (comma-separated)</label>
-                        <textarea class="form-control" id="serial_numbers" name="serial_numbers" rows="2"
-                                  placeholder="Enter serial numbers separated by commas"></textarea>
-                        <small class="text-muted">Example: SN001, SN002, SN003</small>
-                    </div>
-                </div>
-
-                <!-- Batch Number Section (shown only for batch items) -->
-                <div id="batchSection" class="row" style="display: none;">
-                    <div class="col-md-12 mb-3">
-                        <label for="batch_number" class="form-label">Batch Number</label>
-                        <input type="text" class="form-control" id="batch_number" name="batch_number"
-                               placeholder="Enter batch number">
+                               value="1" readonly>
                     </div>
                 </div>
 
                 <div class="text-end">
-                    <button type="submit" class="btn btn-success">
+                    <button type="submit" class="btn btn-success" id="btnAddItem" disabled>
                         <i class="fas fa-plus"></i> Add Item
                     </button>
                 </div>
@@ -231,56 +216,77 @@
 <script>
 const transferId = {{ transfer.id }};
 
-function validateItem() {
-    const itemCode = document.getElementById('item_code').value.trim();
-    
-    if (!itemCode) {
-        alert('Please enter an item code');
+document.getElementById('btnSearchSerial').addEventListener('click', function() {
+    searchSerial();
+});
+
+document.getElementById('serial_number_search').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        searchSerial();
+    }
+});
+
+function searchSerial() {
+    const serial = document.getElementById('serial_number_search').value.trim();
+    if (!serial) {
+        alert('Please enter a serial number');
         return;
     }
 
-    const formData = new FormData();
-    formData.append('item_code', itemCode);
+    const searchBtn = document.getElementById('btnSearchSerial');
+    searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    searchBtn.disabled = true;
 
-    fetch('/direct-inventory-transfer/api/validate-item', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            document.getElementById('item_description').value = data.item_description;
-            document.getElementById('item_type').value = data.item_type;
-            document.getElementById('item_type_display').value = data.item_type.charAt(0).toUpperCase() + data.item_type.slice(1);
-            
-            if (data.item_type === 'serial') {
-                document.getElementById('serialSection').style.display = 'block';
-                document.getElementById('batchSection').style.display = 'none';
-            } else if (data.item_type === 'batch') {
-                document.getElementById('serialSection').style.display = 'none';
-                document.getElementById('batchSection').style.display = 'block';
+    fetch(`/direct-inventory-transfer/api/get-serial-location?serial_number=${encodeURIComponent(serial)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.value && data.value.length > 0) {
+                const item = data.value[0];
+                document.getElementById('item_code').value = item.ItemCode;
+                document.getElementById('item_code_display').value = item.ItemCode;
+                document.getElementById('item_description_display').value = item.itemName;
+                document.getElementById('btnAddItem').disabled = false;
+                alert('Serial number found and validated!');
             } else {
-                document.getElementById('serialSection').style.display = 'none';
-                document.getElementById('batchSection').style.display = 'none';
+                alert('Serial number not found or invalid');
+                resetAddItemForm();
             }
-        } else {
-            alert('Validation failed: ' + data.error);
-            document.getElementById('item_description').value = '';
-            document.getElementById('item_type').value = '';
-            document.getElementById('item_type_display').value = '';
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error validating item');
-    });
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error searching serial number');
+        })
+        .finally(() => {
+            searchBtn.innerHTML = '<i class="fas fa-search"></i> Search';
+            searchBtn.disabled = false;
+        });
+}
+
+function resetAddItemForm() {
+    document.getElementById('item_code').value = '';
+    document.getElementById('item_code_display').value = '';
+    document.getElementById('item_description_display').value = '';
+    document.getElementById('btnAddItem').disabled = true;
 }
 
 document.getElementById('addItemForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
-    const formData = new FormData(this);
+    const serial = document.getElementById('serial_number_search').value.trim();
+    const itemCode = document.getElementById('item_code').value;
     
+    if (!serial || !itemCode) {
+        alert('Please search and validate a serial number first');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('item_code', itemCode);
+    formData.append('item_type', 'serial');
+    formData.append('quantity', 1);
+    formData.append('serial_numbers', serial);
+
     fetch(`/direct-inventory-transfer/${transferId}/add_item`, {
         method: 'POST',
         body: formData
@@ -288,7 +294,6 @@ document.getElementById('addItemForm').addEventListener('submit', function(e) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
             location.reload();
         } else {
             alert('Error: ' + data.error);

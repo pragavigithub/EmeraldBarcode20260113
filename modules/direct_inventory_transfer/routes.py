@@ -207,7 +207,57 @@ def detail(transfer_id):
     return render_template('direct_inventory_transfer/detail.html', transfer=transfer)
 
 
-@direct_inventory_transfer_bp.route('/api/get-warehouses', methods=['GET'])
+@direct_inventory_transfer_bp.route('/api/get-serial-location', methods=['GET'])
+@login_required
+def get_serial_location():
+    """Get serial number location from SAP B1"""
+    try:
+        serial_number = request.args.get('serial_number')
+        if not serial_number:
+            return jsonify({'success': False, 'error': 'Serial number is required'}), 400
+
+        sap = SAPIntegration()
+        if not sap.ensure_logged_in():
+            return jsonify({'success': False, 'error': 'SAP B1 authentication failed'}), 500
+
+        # Query SAP for serial number location
+        # This is a simplified example, adjust based on actual SAP service layer schema
+        url = f"{sap.base_url}/b1s/v1/SQLQueries('item_location_by_serial')/List?SerialNum='{serial_number}'"
+        response = sap.session.get(url, timeout=30)
+        
+        if response.status_code == 200:
+            return jsonify({'success': True, 'value': response.json().get('value', [])})
+        else:
+            # Fallback to direct OData if query doesn't exist
+            return jsonify({'success': False, 'error': f'SAP API error: {response.status_code}'}), 500
+    except Exception as e:
+        logging.error(f"Error fetching serial location: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@direct_inventory_transfer_bp.route('/api/get-bin-code', methods=['GET'])
+@login_required
+def get_bin_code():
+    """Get bin code by AbsEntry from SAP B1"""
+    try:
+        abs_entry = request.args.get('abs_entry')
+        if not abs_entry:
+            return jsonify({'success': False, 'error': 'AbsEntry is required'}), 400
+
+        sap = SAPIntegration()
+        if not sap.ensure_logged_in():
+            return jsonify({'success': False, 'error': 'SAP B1 authentication failed'}), 500
+
+        url = f"{sap.base_url}/b1s/v1/BinLocations({abs_entry})?$select=BinCode"
+        response = sap.session.get(url, timeout=30)
+        
+        if response.status_code == 200:
+            return jsonify({'success': True, 'value': [response.json()]})
+        else:
+            return jsonify({'success': False, 'error': f'SAP API error: {response.status_code}'}), 500
+    except Exception as e:
+        logging.error(f"Error fetching bin code: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @login_required
 def get_warehouses():
     """Get warehouse list from SAP B1"""
