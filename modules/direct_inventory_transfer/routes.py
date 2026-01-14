@@ -415,21 +415,42 @@ def add_item(transfer_id):
             if len(serial_numbers_list) != int(quantity):
                 return jsonify({'success': False, 'error': f'Number of serial numbers ({len(serial_numbers_list)}) must match quantity ({int(quantity)})'}), 400
             
-            # Create separate items for each serial number
-            for serial in serial_numbers_list:
+            # Check if an entry for this item already exists in this transfer
+            transfer_item = DirectInventoryTransferItem.query.filter_by(
+                direct_inventory_transfer_id=transfer.id,
+                item_code=validation_result.get('item_code'),
+                from_warehouse_code=transfer.from_warehouse,
+                to_warehouse_code=transfer.to_warehouse,
+                from_bin_code=transfer.from_bin,
+                to_bin_code=transfer.to_bin
+            ).first()
+
+            if transfer_item:
+                # Append serial numbers to existing line
+                existing_serials = json.loads(transfer_item.serial_numbers) if transfer_item.serial_numbers else []
+                # Filter out duplicates
+                new_serials = [s for s in serial_numbers_list if s not in existing_serials]
+                if not new_serials:
+                    return jsonify({'success': False, 'error': 'All serial numbers already exist in this transfer'}), 400
+                
+                existing_serials.extend(new_serials)
+                transfer_item.serial_numbers = json.dumps(existing_serials)
+                transfer_item.quantity = float(len(existing_serials))
+            else:
+                # Create a new line with all serials
                 transfer_item = DirectInventoryTransferItem(
                     direct_inventory_transfer_id=transfer.id,
                     item_code=validation_result.get('item_code'),
                     item_description=validation_result.get('item_description', ''),
                     barcode=item_code,
                     item_type=item_type_validated,
-                    quantity=1.0,
+                    quantity=quantity,
                     from_warehouse_code=transfer.from_warehouse,
                     to_warehouse_code=transfer.to_warehouse,
                     from_bin_code=transfer.from_bin,
                     to_bin_code=transfer.to_bin,
                     batch_number=None,
-                    serial_numbers=json.dumps([serial]),
+                    serial_numbers=json.dumps(serial_numbers_list),
                     validation_status='validated'
                 )
                 db.session.add(transfer_item)
@@ -438,7 +459,8 @@ def add_item(transfer_id):
             
             return jsonify({
                 'success': True,
-                'message': f'{len(serial_numbers_list)} serials added as separate lines'
+                'message': f'{len(serial_numbers_list)} serials added to the item line',
+                'transfer_id': transfer.id
             })
         
         elif is_batch_managed:

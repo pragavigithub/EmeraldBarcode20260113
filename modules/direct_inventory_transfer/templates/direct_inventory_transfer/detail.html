@@ -118,6 +118,26 @@
         </div>
     </div>
     {% endif %}
+    
+    <!-- Serials Modal -->
+    <div class="modal fade" id="serialsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="serialsModalTitle">Serial Numbers</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="serialsModalList" class="d-flex flex-wrap gap-2">
+                        <!-- Serials will be inserted here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Items Table -->
     <div class="card shadow">
@@ -159,12 +179,16 @@
                             <td>
                                 {% if item.item_type == 'serial' and item.serial_numbers %}
                                     {% set sns = item.serial_numbers|from_json %}
-                                    <div class="d-flex flex-wrap gap-1">
-                                        {% for sn in sns %}
-                                        <span class="badge bg-info">{{ sn }}</span>
-                                        {% endfor %}
+                                    <div class="d-flex align-items-center">
+                                        <button type="button" class="btn btn-sm btn-info rounded-pill me-2" 
+                                                onclick="viewSerials('{{ item.item_code }}', {{ sns|tojson|safe }})">
+                                            {{ sns[0] }}
+                                            {% if sns|length > 1 %}
+                                                <span class="ms-1">(+{{ sns|length - 1 }})</span>
+                                            {% endif %}
+                                        </button>
+                                        <small class="text-muted">{{ sns|length }} serial(s)</small>
                                     </div>
-                                    <small class="text-muted">{{ sns|length }} serial(s)</small>
                                 {% elif item.item_type == 'batch' and item.batch_number %}
                                     <span class="badge bg-warning">{{ item.batch_number }}</span>
                                 {% else %}
@@ -384,6 +408,22 @@ function submitTransfer() {
         console.error('Error:', error);
         alert('Error submitting transfer');
     });
+}
+
+function viewSerials(itemCode, serials) {
+    document.getElementById('serialsModalTitle').innerText = `Serial Numbers for ${itemCode}`;
+    const listContainer = document.getElementById('serialsModalList');
+    listContainer.innerHTML = '';
+    
+    serials.forEach(sn => {
+        const span = document.createElement('span');
+        span.className = 'badge bg-info p-2';
+        span.innerText = sn;
+        listContainer.appendChild(span);
+    });
+    
+    const modal = new bootstrap.Modal(document.getElementById('serialsModal'));
+    modal.show();
 }
 </script>
 {% endblock %}

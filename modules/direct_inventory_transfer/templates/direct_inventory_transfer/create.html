@@ -298,51 +298,73 @@ function loadBinLocations(warehouseCode, selectId) {
         });
 }
 
-function addTransferLine() {
-    const serial = document.getElementById('serial_number_search').value.trim();
-    const itemCode = document.getElementById('item_code').value;
-    const itemDescription = document.getElementById('item_description').value;
-    const fromWhs = document.getElementById('from_warehouse').value;
-    const toWhs = document.getElementById('to_warehouse').value;
-    const fromBin = document.getElementById('from_bin').value;
-    const toBin = document.getElementById('to_bin').value;
-    const bplId = document.getElementById('bpl_id').value;
-    const comments = document.getElementById('comments').value;
+    function addTransferLine() {
+        const serial = document.getElementById('serial_number_search').value.trim();
+        const itemCode = document.getElementById('item_code').value;
+        const itemDescription = document.getElementById('item_description').value;
+        const fromWhs = document.getElementById('from_warehouse').value;
+        const toWhs = document.getElementById('to_warehouse').value;
+        const fromBin = document.getElementById('from_bin').value;
+        const toBin = document.getElementById('to_bin').value;
+        const bplId = document.getElementById('bpl_id').value;
+        const comments = document.getElementById('comments').value;
 
-    if (!serial || !itemCode || !fromWhs || !toWhs || !bplId) {
-        showAlert('warning', 'Please complete the serial search and warehouse selection first');
-        return;
-    }
-
-    const transferData = new FormData();
-    transferData.append('item_code', itemCode);
-    transferData.append('item_type', 'serial');
-    transferData.append('quantity', 1);
-    transferData.append('from_warehouse', fromWhs);
-    transferData.append('to_warehouse', toWhs);
-    transferData.append('from_bin', fromBin);
-    transferData.append('to_bin', toBin);
-    transferData.append('notes', comments);
-    transferData.append('serial_numbers', serial);
-
-    fetch('/direct-inventory-transfer/create', {
-        method: 'POST',
-        body: transferData
-    })
-    .then(response => {
-        if (response.redirected) {
-            window.location.href = response.url;
-        } else {
-            return response.json().then(data => {
-                showAlert('danger', data.error || 'Error creating transfer');
-            });
+        if (!serial || !itemCode || !fromWhs || !toWhs || !bplId) {
+            showAlert('warning', 'Please complete the serial search and warehouse selection first');
+            return;
         }
-    })
-    .catch(error => {
-        console.error('Error creating transfer:', error);
-        showAlert('danger', 'Error connecting to server');
-    });
-}
+
+        const transferData = new FormData();
+        transferData.append('item_code', itemCode);
+        transferData.append('item_type', 'serial');
+        transferData.append('quantity', 1);
+        transferData.append('from_warehouse', fromWhs);
+        transferData.append('to_warehouse', toWhs);
+        transferData.append('from_bin', fromBin);
+        transferData.append('to_bin', toBin);
+        transferData.append('notes', comments);
+        transferData.append('serial_numbers', serial);
+
+        // Show loading state
+        const btnAddLine = document.getElementById('btnAddLine');
+        const originalText = btnAddLine.innerHTML;
+        btnAddLine.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+        btnAddLine.disabled = true;
+
+        fetch('/direct-inventory-transfer/create', {
+            method: 'POST',
+            body: transferData
+        })
+        .then(response => {
+            if (response.redirected) {
+                window.location.href = response.url;
+            } else {
+                return response.json().then(data => {
+                    if (data.success) {
+                        showAlert('success', data.message || 'Item added successfully');
+                        // Refresh the page to show grouped serials in the detail view
+                        setTimeout(() => {
+                             if (data.transfer_id) {
+                                 window.location.href = `/direct-inventory-transfer/${data.transfer_id}`;
+                             } else {
+                                 location.reload();
+                             }
+                        }, 1000);
+                    } else {
+                        showAlert('danger', data.error || 'Error adding item');
+                    }
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error adding item:', error);
+            showAlert('danger', 'Error connecting to server');
+        })
+        .finally(() => {
+            btnAddLine.innerHTML = originalText;
+            btnAddLine.disabled = false;
+        });
+    }
 
 function updateTransferLinesDisplay() {
     const container = document.getElementById('transferLinesContainer');
