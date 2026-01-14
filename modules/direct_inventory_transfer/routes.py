@@ -442,6 +442,56 @@ def add_item(transfer_id):
             })
         
         elif is_batch_managed:
+            if not batch_number:
+                return jsonify({'success': False, 'error': 'Batch number is required for batch-managed items'}), 400
+
+            transfer_item = DirectInventoryTransferItem(
+                direct_inventory_transfer_id=transfer.id,
+                item_code=validation_result.get('item_code'),
+                item_description=validation_result.get('item_description', ''),
+                barcode=item_code,
+                item_type=item_type_validated,
+                quantity=quantity,
+                from_warehouse_code=transfer.from_warehouse,
+                to_warehouse_code=transfer.to_warehouse,
+                from_bin_code=transfer.from_bin,
+                to_bin_code=transfer.to_bin,
+                batch_number=batch_number,
+                serial_numbers=None,
+                validation_status='validated'
+            )
+            db.session.add(transfer_item)
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': f'Batch {batch_number} added successfully'
+            })
+        
+        else:
+            # Non-serial, non-batch
+            transfer_item = DirectInventoryTransferItem(
+                direct_inventory_transfer_id=transfer.id,
+                item_code=validation_result.get('item_code'),
+                item_description=validation_result.get('item_description', ''),
+                barcode=item_code,
+                item_type=item_type_validated,
+                quantity=quantity,
+                from_warehouse_code=transfer.from_warehouse,
+                to_warehouse_code=transfer.to_warehouse,
+                from_bin_code=transfer.from_bin,
+                to_bin_code=transfer.to_bin,
+                batch_number=None,
+                serial_numbers=None,
+                validation_status='validated'
+            )
+            db.session.add(transfer_item)
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': f'Item {item_code} added successfully'
+            })
 
     except Exception as e:
         logging.error(f"Error adding item: {str(e)}")
