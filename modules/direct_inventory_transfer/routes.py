@@ -232,6 +232,7 @@ def get_bin_code():
         logging.error(f"Error fetching bin code: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@direct_inventory_transfer_bp.route('/api/get-warehouses', methods=['GET'])
 @login_required
 def get_warehouses():
     """Get warehouse list from SAP B1"""
