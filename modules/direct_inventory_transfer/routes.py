@@ -101,10 +101,14 @@ def create():
             batch_number = request.form.get('batch_number', '').strip()
 
             if not all([item_code, from_warehouse, to_warehouse]):
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+                    return jsonify({'success': False, 'error': 'Item Code, From Warehouse and To Warehouse are required'}), 400
                 flash('Item Code, From Warehouse and To Warehouse are required', 'error')
                 return render_template('direct_inventory_transfer/create.html')
 
             if from_warehouse == to_warehouse:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+                    return jsonify({'success': False, 'error': 'From Warehouse and To Warehouse must be different'}), 400
                 flash('From Warehouse and To Warehouse must be different', 'error')
                 return render_template('direct_inventory_transfer/create.html')
 
@@ -408,6 +412,72 @@ def add_item(transfer_id):
 
     except Exception as e:
         logging.error(f"Error adding item: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@direct_inventory_transfer_bp.route('/items/<int:item_id>/edit', methods=['POST'])
+@login_required
+def edit_item(item_id):
+    """Edit item in transfer"""
+    try:
+        item = DirectInventoryTransferItem.query.get_or_404(item_id)
+        transfer = item.direct_inventory_transfer
+
+        if transfer.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+
+        if transfer.status != 'draft':
+            return jsonify({'success': False, 'error': 'Cannot edit items in non-draft transfer'}), 400
+
+        quantity = float(request.form.get('quantity', item.quantity))
+        serial_numbers_str = request.form.get('serial_numbers', '').strip()
+        batch_number = request.form.get('batch_number', item.batch_number).strip()
+
+        if item.item_type == 'serial':
+            if not serial_numbers_str:
+                return jsonify({'success': False, 'error': 'Serial numbers are required'}), 400
+            serial_numbers_list = [sn.strip() for sn in serial_numbers_str.split(',') if sn.strip()]
+            if len(serial_numbers_list) != int(quantity):
+                return jsonify({'success': False, 'error': f'Number of serials ({len(serial_numbers_list)}) must match quantity ({int(quantity)})'}), 400
+            item.serial_numbers = json.dumps(serial_numbers_list)
+        
+        elif item.item_type == 'batch':
+            if not batch_number:
+                return jsonify({'success': False, 'error': 'Batch number is required'}), 400
+            item.batch_number = batch_number
+
+        item.quantity = quantity
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Item updated successfully'})
+
+    except Exception as e:
+        logging.error(f"Error editing item: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@direct_inventory_transfer_bp.route('/<int:transfer_id>/delete', methods=['POST'])
+@login_required
+def delete_transfer(transfer_id):
+    """Delete the entire transfer"""
+    try:
+        transfer = DirectInventoryTransfer.query.get_or_404(transfer_id)
+
+        if transfer.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+
+        if transfer.status != 'draft':
+            return jsonify({'success': False, 'error': 'Only draft transfers can be deleted'}), 400
+
+        db.session.delete(transfer)
+        db.session.commit()
+
+        return jsonify({'success': True, 'message': 'Transfer deleted successfully'})
+
+    except Exception as e:
+        logging.error(f"Error deleting transfer: {str(e)}")
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 

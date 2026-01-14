@@ -307,55 +307,44 @@ function addTransferLine() {
     const fromBin = document.getElementById('from_bin').value;
     const toBin = document.getElementById('to_bin').value;
     const bplId = document.getElementById('bpl_id').value;
+    const comments = document.getElementById('comments').value;
 
     if (!serial || !itemCode || !fromWhs || !toWhs || !bplId) {
         showAlert('warning', 'Please complete the serial search and warehouse selection first');
         return;
     }
 
-    // Check if this serial number already exists in transfer lines
-    const existingLine = window.transferLines.find(line => 
-        line.serialNumbers.some(sn => sn.InternalSerialNumber === serial)
-    );
-    
-    if (existingLine) {
-        showAlert('warning', `Serial number ${serial} is already added to transfer lines`);
+    // Step 1: Create the transfer document if it doesn't exist
+    if (!window.currentTransferId) {
+        const transferData = new FormData();
+        transferData.append('item_code', itemCode);
+        transferData.append('item_type', 'serial');
+        transferData.append('quantity', 1);
+        transferData.append('from_warehouse', fromWhs);
+        transferData.append('to_warehouse', toWhs);
+        transferData.append('from_bin', fromBin);
+        transferData.append('to_bin', toBin);
+        transferData.append('notes', comments);
+        transferData.append('serial_numbers', serial);
+
+        fetch('/direct-inventory-transfer/create', {
+            method: 'POST',
+            body: transferData
+        })
+        .then(response => {
+            if (response.redirected) {
+                // Successfully created and redirected to detail page
+                window.location.href = response.url;
+            } else {
+                return response.text().then(text => { throw new Error(text) });
+            }
+        })
+        .catch(error => {
+            console.error('Error creating transfer:', error);
+            showAlert('danger', 'Error creating transfer in database');
+        });
         return;
     }
-
-    // Check if we have an existing line for this item code
-    let existingItemLine = window.transferLines.find(line => line.ItemCode === itemCode);
-    
-    if (existingItemLine) {
-        // Add serial to existing line
-        existingItemLine.serialNumbers.push({
-            InternalSerialNumber: serial,
-            Quantity: 1
-        });
-        existingItemLine.Quantity += 1;
-    } else {
-        // Create new line
-        const newLine = {
-            LineNum: window.currentLineIndex++,
-            ItemCode: itemCode,
-            ItemDescription: itemDescription,
-            Quantity: 1,
-            WarehouseCode: toWhs,
-            FromWarehouseCode: fromWhs,
-            FromBin: fromBin,
-            ToBin: toBin,
-            BPLId: parseInt(bplId),
-            serialNumbers: [{
-                InternalSerialNumber: serial,
-                Quantity: 1
-            }]
-        };
-        window.transferLines.push(newLine);
-    }
-
-    updateTransferLinesDisplay();
-    clearSerialSearch();
-    showAlert('success', `Serial ${serial} added to transfer lines`);
 }
 
 function updateTransferLinesDisplay() {

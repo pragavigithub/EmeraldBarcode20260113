@@ -195,6 +195,9 @@
                             </td>
                             {% if transfer.status == 'draft' %}
                             <td>
+                                <button class="btn btn-sm btn-info me-1" onclick="editItem({{ item.id }}, '{{ item.item_type }}', {{ item.quantity }}, '{{ item.batch_number or '' }}', '{{ (item.serial_numbers|from_json)|join(',') if item.serial_numbers else '' }}')">
+                                    <i class="fas fa-edit"></i>
+                                </button>
                                 <button class="btn btn-sm btn-danger" onclick="deleteItem({{ item.id }})">
                                     <i class="fas fa-trash"></i>
                                 </button>
@@ -316,6 +319,42 @@ function deleteItem(itemId) {
     .catch(error => {
         console.error('Error:', error);
         alert('Error deleting item');
+    });
+}
+
+function editItem(itemId, itemType, quantity, batchNumber, serialNumbers) {
+    let newQty = prompt("Enter new quantity:", quantity);
+    if (newQty === null) return;
+    
+    let formData = new FormData();
+    formData.append('quantity', newQty);
+    
+    if (itemType === 'serial') {
+        let newSerials = prompt("Enter serial numbers (comma separated):", serialNumbers);
+        if (newSerials === null) return;
+        formData.append('serial_numbers', newSerials);
+    } else if (itemType === 'batch') {
+        let newBatch = prompt("Enter batch number:", batchNumber);
+        if (newBatch === null) return;
+        formData.append('batch_number', newBatch);
+    }
+    
+    fetch(`/direct-inventory-transfer/items/${itemId}/edit`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error updating item');
     });
 }
 
