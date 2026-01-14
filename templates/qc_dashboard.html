@@ -1250,10 +1250,25 @@ document.getElementById('approvalForm').addEventListener('submit', function(e) {
     
     fetch(form.action, {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
     })
-    .then(response => response.json())
+    .then(response => {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+            return response.json();
+        } else {
+            if (response.redirected) {
+                window.location.href = response.url;
+                return;
+            }
+            throw new Error('Server returned an unexpected response (likely an HTML error page).');
+        }
+    })
     .then(data => {
+        if (!data) return;
         if (data.success) {
             // Close modal
             const modal = bootstrap.Modal.getInstance(document.getElementById('approvalModal'));
@@ -1266,6 +1281,9 @@ document.getElementById('approvalForm').addEventListener('submit', function(e) {
             }
             if (data.sap_document_number) {
                 message += ` (Doc #${data.sap_document_number})`;
+            }
+            if (data.doc_num) {
+                message += ` (Doc #${data.doc_num})`;
             }
             
             // Create success alert
@@ -1315,10 +1333,25 @@ document.getElementById('rejectionForm').addEventListener('submit', function(e) 
     
     fetch(form.action, {
         method: 'POST',
-        body: formData
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
     })
-    .then(response => response.json())
+    .then(response => {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+            return response.json();
+        } else {
+            if (response.redirected) {
+                window.location.href = response.url;
+                return;
+            }
+            throw new Error('Server returned an unexpected response (likely an HTML error page).');
+        }
+    })
     .then(data => {
+        if (!data) return;
         if (data.success) {
             // Close modal
             const modal = bootstrap.Modal.getInstance(document.getElementById('rejectionModal'));
