@@ -162,26 +162,50 @@ def create():
             db.session.add(transfer)
             db.session.flush()
 
-            transfer_item = DirectInventoryTransferItem(
-                direct_inventory_transfer_id=transfer.id,
-                item_code=validation_result.get('item_code'),
-                item_description=validation_result.get('item_description'),
-                barcode=item_code,
-                item_type=item_type_validated,
-                quantity=quantity,
-                from_warehouse_code=from_warehouse,
-                to_warehouse_code=to_warehouse,
-                from_bin_code=from_bin,
-                to_bin_code=to_bin,
-                batch_number=batch_number if is_batch_managed else None,
-                serial_numbers=serial_numbers_json,
-                validation_status='validated',
-                qc_status='pending'
-            )
+            if is_serial_managed:
+                serial_numbers_list = [sn.strip() for sn in serial_numbers_str.split(',') if sn.strip()]
+                for serial in serial_numbers_list:
+                    transfer_item = DirectInventoryTransferItem(
+                        direct_inventory_transfer_id=transfer.id,
+                        item_code=validation_result.get('item_code'),
+                        item_description=validation_result.get('item_description'),
+                        barcode=item_code,
+                        item_type=item_type_validated,
+                        quantity=1.0,
+                        from_warehouse_code=from_warehouse,
+                        to_warehouse_code=to_warehouse,
+                        from_bin_code=from_bin,
+                        to_bin_code=to_bin,
+                        batch_number=None,
+                        serial_numbers=json.dumps([serial]),
+                        validation_status='validated',
+                        qc_status='pending'
+                    )
+                    db.session.add(transfer_item)
+            else:
+                transfer_item = DirectInventoryTransferItem(
+                    direct_inventory_transfer_id=transfer.id,
+                    item_code=validation_result.get('item_code'),
+                    item_description=validation_result.get('item_description'),
+                    barcode=item_code,
+                    item_type=item_type_validated,
+                    quantity=quantity,
+                    from_warehouse_code=from_warehouse,
+                    to_warehouse_code=to_warehouse,
+                    from_bin_code=from_bin,
+                    to_bin_code=to_bin,
+                    batch_number=batch_number if is_batch_managed else None,
+                    serial_numbers=None,
+                    validation_status='validated',
+                    qc_status='pending'
+                )
+                db.session.add(transfer_item)
 
-            db.session.add(transfer_item)
             db.session.commit()
 
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+                return redirect(url_for('direct_inventory_transfer.detail', transfer_id=transfer.id))
+            
             flash(f'Direct Inventory Transfer {transfer_number} created successfully with item {item_code}', 'success')
             return redirect(url_for('direct_inventory_transfer.detail', transfer_id=transfer.id))
             
@@ -382,9 +406,6 @@ def add_item(transfer_id):
         is_serial_managed = validation_result.get('is_serial_managed', False)
         is_batch_managed = validation_result.get('is_batch_managed', False)
 
-        serial_numbers_json = None
-        serial_numbers_list = []
-        
         if is_serial_managed:
             if not serial_numbers_str:
                 return jsonify({'success': False, 'error': 'Serial numbers are required for serial-managed items'}), 400
@@ -394,46 +415,33 @@ def add_item(transfer_id):
             if len(serial_numbers_list) != int(quantity):
                 return jsonify({'success': False, 'error': f'Number of serial numbers ({len(serial_numbers_list)}) must match quantity ({int(quantity)})'}), 400
             
-            serial_numbers_json = json.dumps(serial_numbers_list)
+            # Create separate items for each serial number
+            for serial in serial_numbers_list:
+                transfer_item = DirectInventoryTransferItem(
+                    direct_inventory_transfer_id=transfer.id,
+                    item_code=validation_result.get('item_code'),
+                    item_description=validation_result.get('item_description', ''),
+                    barcode=item_code,
+                    item_type=item_type_validated,
+                    quantity=1.0,
+                    from_warehouse_code=transfer.from_warehouse,
+                    to_warehouse_code=transfer.to_warehouse,
+                    from_bin_code=transfer.from_bin,
+                    to_bin_code=transfer.to_bin,
+                    batch_number=None,
+                    serial_numbers=json.dumps([serial]),
+                    validation_status='validated'
+                )
+                db.session.add(transfer_item)
+            
+            db.session.commit()
+            
+            return jsonify({
+                'success': True,
+                'message': f'{len(serial_numbers_list)} serials added as separate lines'
+            })
         
         elif is_batch_managed:
-            if not batch_number:
-                return jsonify({'success': False, 'error': 'Batch number is required for batch-managed items'}), 400
-
-        transfer_item = DirectInventoryTransferItem(
-            direct_inventory_transfer_id=transfer.id,
-            item_code=validation_result.get('item_code'),
-            item_description=validation_result.get('item_description', ''),
-            barcode=item_code,
-            item_type=item_type_validated,
-            quantity=quantity,
-            from_warehouse_code=transfer.from_warehouse,
-            to_warehouse_code=transfer.to_warehouse,
-            from_bin_code=transfer.from_bin,
-            to_bin_code=transfer.to_bin,
-            batch_number=batch_number if is_batch_managed else None,
-            serial_numbers=serial_numbers_json,
-            validation_status='validated'
-        )
-
-        db.session.add(transfer_item)
-        db.session.commit()
-
-        logging.info(f"✅ Item {item_code} added to transfer {transfer_id}")
-
-        return jsonify({
-            'success': True,
-            'message': f'Item {item_code} added successfully',
-            'item_data': {
-                'id': transfer_item.id,
-                'item_code': transfer_item.item_code,
-                'item_description': transfer_item.item_description,
-                'item_type': transfer_item.item_type,
-                'quantity': transfer_item.quantity,
-                'batch_number': transfer_item.batch_number,
-                'serial_numbers': json.loads(transfer_item.serial_numbers) if transfer_item.serial_numbers else []
-            }
-        })
 
     except Exception as e:
         logging.error(f"Error adding item: {str(e)}")

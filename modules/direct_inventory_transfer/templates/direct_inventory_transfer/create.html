@@ -314,37 +314,34 @@ function addTransferLine() {
         return;
     }
 
-    // Step 1: Create the transfer document if it doesn't exist
-    if (!window.currentTransferId) {
-        const transferData = new FormData();
-        transferData.append('item_code', itemCode);
-        transferData.append('item_type', 'serial');
-        transferData.append('quantity', 1);
-        transferData.append('from_warehouse', fromWhs);
-        transferData.append('to_warehouse', toWhs);
-        transferData.append('from_bin', fromBin);
-        transferData.append('to_bin', toBin);
-        transferData.append('notes', comments);
-        transferData.append('serial_numbers', serial);
+    const transferData = new FormData();
+    transferData.append('item_code', itemCode);
+    transferData.append('item_type', 'serial');
+    transferData.append('quantity', 1);
+    transferData.append('from_warehouse', fromWhs);
+    transferData.append('to_warehouse', toWhs);
+    transferData.append('from_bin', fromBin);
+    transferData.append('to_bin', toBin);
+    transferData.append('notes', comments);
+    transferData.append('serial_numbers', serial);
 
-        fetch('/direct-inventory-transfer/create', {
-            method: 'POST',
-            body: transferData
-        })
-        .then(response => {
-            if (response.redirected) {
-                // Successfully created and redirected to detail page
-                window.location.href = response.url;
-            } else {
-                return response.text().then(text => { throw new Error(text) });
-            }
-        })
-        .catch(error => {
-            console.error('Error creating transfer:', error);
-            showAlert('danger', 'Error creating transfer in database');
-        });
-        return;
-    }
+    fetch('/direct-inventory-transfer/create', {
+        method: 'POST',
+        body: transferData
+    })
+    .then(response => {
+        if (response.redirected) {
+            window.location.href = response.url;
+        } else {
+            return response.json().then(data => {
+                showAlert('danger', data.error || 'Error creating transfer');
+            });
+        }
+    })
+    .catch(error => {
+        console.error('Error creating transfer:', error);
+        showAlert('danger', 'Error connecting to server');
+    });
 }
 
 function updateTransferLinesDisplay() {
