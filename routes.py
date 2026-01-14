@@ -3113,22 +3113,73 @@ def reject_serial_item_transfer_qc(transfer_id):
 @app.route('/direct_inventory_transfer/<int:transfer_id>/qc_approve', methods=['POST'])
 @login_required
 def approve_direct_transfer_qc(transfer_id):
-    """Approve Direct Inventory Transfer from QC Dashboard"""
+    """Approve Direct Inventory Transfer from QC Dashboard and post to SAP B1"""
     try:
         from models import DirectInventoryTransfer
         transfer = DirectInventoryTransfer.query.get_or_404(transfer_id)
         
         if not current_user.has_permission('qc_dashboard') and current_user.role not in ['admin', 'manager']:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+                return jsonify({'success': False, 'error': 'Access denied - QC permissions required'}), 403
             flash('Access denied - QC permissions required', 'error')
             return redirect(url_for('qc_dashboard'))
         
         if transfer.status != 'submitted':
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+                return jsonify({'success': False, 'error': 'Only submitted transfers can be approved'}), 400
             flash('Only submitted transfers can be approved', 'error')
             return redirect(url_for('qc_dashboard'))
         
         qc_notes = request.form.get('qc_notes', '').strip()
         
-        transfer.status = 'qc_approved'
+        # Initialize SAP integration
+        sap = SAPIntegration()
+        if not sap.ensure_logged_in():
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+                return jsonify({'success': False, 'error': 'SAP B1 authentication failed'}), 500
+            flash('SAP B1 authentication failed', 'error')
+            return redirect(url_for('qc_dashboard'))
+
+        # Prepare SAP payload
+        document_lines = []
+        for index, item in enumerate(transfer.items):
+            line_data = {
+                'LineNum': index,
+                'ItemCode': item.item_code,
+                'Quantity': item.quantity,
+                'FromWarehouseCode': item.from_warehouse_code,
+                'WarehouseCode': item.to_warehouse_code,
+            }
+            
+            if item.item_type == 'serial' and item.serial_numbers:
+                serials = json.loads(item.serial_numbers)
+                line_data['SerialNumbers'] = [{'InternalSerialNumber': sn, 'Quantity': 1.0} for sn in serials]
+            elif item.item_type == 'batch' and item.batch_number:
+                line_data['BatchNumbers'] = [{'BatchNumber': item.batch_number, 'Quantity': item.quantity}]
+                
+            document_lines.append(line_data)
+
+        payload = {
+            'DocDate': datetime.utcnow().strftime('%Y-%m-%d'),
+            'Comments': qc_notes or f'Direct Transfer {transfer.transfer_number} - QC Approved by {current_user.username}',
+            'FromWarehouse': transfer.from_warehouse,
+            'ToWarehouse': transfer.to_warehouse,
+            'StockTransferLines': document_lines
+        }
+
+        # Post to SAP
+        result = sap.create_stock_transfer(payload)
+        
+        if not result.get('success'):
+            sap_error = result.get('error', 'Unknown SAP error')
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+                return jsonify({'success': False, 'error': f'SAP Posting Failed: {sap_error}'}), 500
+            flash(f'SAP Posting Failed: {sap_error}', 'error')
+            return redirect(url_for('qc_dashboard'))
+
+        # Update local database status
+        transfer.status = 'posted'
+        transfer.sap_document_number = result.get('doc_num')
         transfer.qc_approver_id = current_user.id
         transfer.qc_approved_at = datetime.utcnow()
         transfer.qc_notes = qc_notes
@@ -3139,13 +3190,23 @@ def approve_direct_transfer_qc(transfer_id):
         
         db.session.commit()
         
-        logging.info(f"✅ Direct Inventory Transfer {transfer_id} approved by {current_user.username}")
-        flash(f'Direct Transfer {transfer.transfer_number} approved successfully!', 'success')
+        logging.info(f"✅ Direct Inventory Transfer {transfer_id} approved and posted to SAP as {transfer.sap_document_number}")
+        
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+            return jsonify({
+                'success': True, 
+                'message': f'Transfer approved and posted to SAP as {transfer.sap_document_number}',
+                'doc_num': transfer.sap_document_number
+            })
+            
+        flash(f'Direct Transfer {transfer.transfer_number} approved and posted to SAP!', 'success')
         return redirect(url_for('qc_dashboard'))
         
     except Exception as e:
         logging.error(f"Error approving direct transfer: {str(e)}")
         db.session.rollback()
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+            return jsonify({'success': False, 'error': str(e)}), 500
         flash('Error approving transfer', 'error')
         return redirect(url_for('qc_dashboard'))
 
