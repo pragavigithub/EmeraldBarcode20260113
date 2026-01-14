@@ -477,12 +477,10 @@ def qc_approve_transfer(transfer_id):
         transfer = DirectInventoryTransfer.query.get_or_404(transfer_id)
 
         if not current_user.has_permission('qc_dashboard') and current_user.role not in ['admin', 'manager']:
-            flash('QC permissions required', 'error')
-            return redirect(url_for('qc_dashboard'))
+            return jsonify({'success': False, 'error': 'QC permissions required'}), 403
 
         if transfer.status != 'submitted':
-            flash('Only submitted transfers can be approved', 'error')
-            return redirect(url_for('qc_dashboard'))
+            return jsonify({'success': False, 'error': 'Only submitted transfers can be approved'}), 400
 
         qc_notes = request.form.get('qc_notes', '')
 
@@ -499,8 +497,7 @@ def qc_approve_transfer(transfer_id):
         sap = SAPIntegration()
         if not sap.ensure_logged_in():
             db.session.rollback()
-            flash('SAP B1 authentication failed', 'error')
-            return redirect(url_for('qc_dashboard'))
+            return jsonify({'success': False, 'error': 'SAP B1 authentication failed'}), 500
 
         # Group items by ItemCode to create proper transfer lines
         items_by_code = {}
@@ -550,8 +547,7 @@ def qc_approve_transfer(transfer_id):
             db.session.rollback()
             sap_error = sap_result.get('error', 'Unknown SAP error')
             logging.error(f"❌ SAP B1 posting failed: {sap_error}")
-            flash(f'SAP B1 posting failed: {sap_error}', 'error')
-            return redirect(url_for('qc_dashboard'))
+            return jsonify({'success': False, 'error': f'SAP B1 posting failed: {sap_error}'}), 500
 
         # Extract document number from SAP response
         sap_data = sap_result.get('data', {})
@@ -563,14 +559,17 @@ def qc_approve_transfer(transfer_id):
         db.session.commit()
 
         logging.info(f"✅ Direct Inventory Transfer {transfer_id} approved by {current_user.username}")
-        flash(f'Transfer {transfer.transfer_number} approved and posted to SAP B1 as {transfer.sap_document_number}', 'success')
-        return redirect(url_for('qc_dashboard'))
+        return jsonify({
+            'success': True,
+            'message': f'Transfer {transfer.transfer_number} approved and posted to SAP B1',
+            'sap_document_number': transfer.sap_document_number,
+            'transfer_number': transfer.transfer_number
+        })
 
     except Exception as e:
         logging.error(f"Error approving direct transfer: {str(e)}")
         db.session.rollback()
-        flash(f'Error approving transfer: {str(e)}', 'error')
-        return redirect(url_for('qc_dashboard'))
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @direct_inventory_transfer_bp.route('/<int:transfer_id>/approve', methods=['POST'])
