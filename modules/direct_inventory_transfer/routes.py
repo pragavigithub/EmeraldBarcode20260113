@@ -88,7 +88,7 @@ def create():
     if request.method == 'POST':
         try:
             transfer_number = generate_direct_transfer_number()
-            
+            print("transfer_number--->", transfer_number)
             item_code = request.form.get('item_code', '').strip()
             item_type = request.form.get('item_type', 'none')
             quantity = float(request.form.get('quantity', 1))
@@ -223,7 +223,7 @@ def create():
 def detail(transfer_id):
     """Direct Inventory Transfer detail page"""
     transfer = DirectInventoryTransfer.query.get_or_404(transfer_id)
-
+    print("transfer->",transfer)
     if transfer.user_id != current_user.id and current_user.role not in ['admin', 'manager', 'qc']:
         flash('Access denied - You can only view your own transfers', 'error')
         return redirect(url_for('direct_inventory_transfer.index'))
@@ -312,7 +312,8 @@ def get_bin_locations():
         # Use direct BinLocations API call
         try:
             url = f"{sap.base_url}/b1s/v1/BinLocations?$select=AbsEntry,BinCode,Warehouse&$filter=Warehouse eq '{warehouse_code}'"
-            response = sap.session.get(url, timeout=30)
+            headers = {"Prefer": "odata.maxpagesize=0"}
+            response = sap.session.get(url,headers=headers, timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
@@ -374,7 +375,7 @@ def add_item(transfer_id):
     """Add item to Direct Inventory Transfer with SAP validation"""
     try:
         transfer = DirectInventoryTransfer.query.get_or_404(transfer_id)
-
+        print("transfer_idtransfer_id---->",transfer)
         if transfer.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
             return jsonify({'success': False, 'error': 'Access denied'}), 403
 
@@ -709,7 +710,7 @@ def qc_approve_transfer(transfer_id):
             "Comments": qc_notes or f"QC Approved WMS Transfer by {current_user.username}",
             "FromWarehouse": transfer.from_warehouse,
             "ToWarehouse": transfer.to_warehouse,
-            "BPLID": 5,  # Default branch, you may want to get this from transfer data
+            #"BPLID": 5,  # Default branch, you may want to get this from transfer data
             "StockTransferLines": list(items_by_code.values())
         }
 
@@ -1093,6 +1094,7 @@ def get_serial_location():
     """Get current location of a serial number"""
     try:
         serial_number = request.args.get('serial_number')
+        print("Inventory serial_number",serial_number)
         if not serial_number:
             return jsonify({'success': False, 'error': 'Serial number required'}), 400
         

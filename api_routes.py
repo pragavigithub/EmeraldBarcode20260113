@@ -155,6 +155,7 @@ def register_api_routes(app):
         """Get current location of a serial number"""
         try:
             serial_number = request.args.get('serial_number')
+            print("serial_number_search-->",serial_number)
             if not serial_number:
                 return jsonify({'success': False, 'error': 'Serial number required'}), 400
             
