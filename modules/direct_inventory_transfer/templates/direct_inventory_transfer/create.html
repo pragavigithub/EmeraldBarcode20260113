@@ -131,6 +131,26 @@
     </div>
 </div>
 
+<!-- Serials Modal -->
+<div class="modal fade" id="serialsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="serialsModalTitle">Serial Numbers</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="serialsModalList" class="d-flex flex-wrap gap-2">
+                    <!-- Serials will be inserted here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Direct Transfer Page Loaded');
@@ -394,9 +414,17 @@ function updateTransferLinesDisplay() {
     `;
 
     window.transferLines.forEach((line, index) => {
-        const serialsDisplay = line.serialNumbers.map(sn => 
-            `<span class="badge bg-info me-1">${sn.InternalSerialNumber}</span>`
-        ).join('');
+        const serialsArray = line.serialNumbers.map(sn => sn.InternalSerialNumber || sn);
+        const serialsDisplay = `
+            <div class="d-flex align-items-center">
+                <button type="button" class="btn btn-sm btn-info rounded-pill me-2" 
+                        onclick="viewSerials('${line.ItemCode}', ${JSON.stringify(serialsArray).replace(/"/g, '&quot;')})">
+                    ${serialsArray[0]}
+                    ${serialsArray.length > 1 ? `<span class="ms-1">(+${serialsArray.length - 1})</span>` : ''}
+                </button>
+                <small class="text-muted">${serialsArray.length} serial(s)</small>
+            </div>
+        `;
         
         html += `
             <tr>
@@ -457,6 +485,22 @@ function manageLine(lineIndex) {
         updateTransferLinesDisplay();
         showAlert('info', 'Transfer line removed');
     }
+}
+
+function viewSerials(itemCode, serials) {
+    document.getElementById('serialsModalTitle').innerText = `Serial Numbers for ${itemCode}`;
+    const listContainer = document.getElementById('serialsModalList');
+    listContainer.innerHTML = '';
+    
+    serials.forEach(sn => {
+        const span = document.createElement('span');
+        span.className = 'badge bg-info p-2';
+        span.innerText = sn;
+        listContainer.appendChild(span);
+    });
+    
+    const modal = new bootstrap.Modal(document.getElementById('serialsModal'));
+    modal.show();
 }
 
 function clearSerialSearch() {

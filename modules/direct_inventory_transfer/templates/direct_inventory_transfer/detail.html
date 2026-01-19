@@ -163,12 +163,14 @@
                     </thead>
                     <tbody id="itemsTableBody">
                         {% for item in transfer.items %}
+                        {% set sns = (item.serial_numbers|from_json) if item.item_type == 'serial' and item.serial_numbers else [] %}
                         <tr id="item-{{ item.id }}">
                             <td>{{ item.item_code }}</td>
                             <td>{{ item.item_description }}</td>
                             <td>
                                 {% if item.item_type == 'serial' %}
-                                    <span class="badge bg-warning">Serial</span>
+                                    <span class="badge bg-warning" style="cursor: pointer;" 
+                                          onclick="viewSerials('{{ item.item_code }}', {{ sns|tojson|safe }})">Serial</span>
                                 {% elif item.item_type == 'batch' %}
                                     <span class="badge bg-info">Batch</span>
                                 {% else %}
@@ -177,8 +179,7 @@
                             </td>
                             <td>{{ item.quantity }}</td>
                             <td>
-                                {% if item.item_type == 'serial' and item.serial_numbers %}
-                                    {% set sns = item.serial_numbers|from_json %}
+                                {% if item.item_type == 'serial' and sns %}
                                     <div class="d-flex align-items-center">
                                         <button type="button" class="btn btn-sm btn-info rounded-pill me-2" 
                                                 onclick="viewSerials('{{ item.item_code }}', {{ sns|tojson|safe }})">
