@@ -412,18 +412,38 @@ function submitTransfer() {
 }
 
 function viewSerials(itemCode, serials) {
+    console.log('viewSerials called for:', itemCode, serials);
     document.getElementById('serialsModalTitle').innerText = `Serial Numbers for ${itemCode}`;
     const listContainer = document.getElementById('serialsModalList');
     listContainer.innerHTML = '';
     
-    serials.forEach(sn => {
+    if (typeof serials === 'string') {
+        try {
+            serials = JSON.parse(serials);
+        } catch (e) {
+            serials = serials.split(',').map(s => s.trim());
+        }
+    }
+    
+    if (Array.isArray(serials)) {
+        serials.forEach(sn => {
+            const span = document.createElement('span');
+            span.className = 'badge bg-info p-2';
+            span.innerText = sn;
+            listContainer.appendChild(span);
+        });
+    } else {
         const span = document.createElement('span');
         span.className = 'badge bg-info p-2';
-        span.innerText = sn;
+        span.innerText = serials;
         listContainer.appendChild(span);
-    });
+    }
     
-    const modal = new bootstrap.Modal(document.getElementById('serialsModal'));
+    const modalElement = document.getElementById('serialsModal');
+    let modal = bootstrap.Modal.getInstance(modalElement);
+    if (!modal) {
+        modal = new bootstrap.Modal(modalElement);
+    }
     modal.show();
 }
 </script>
