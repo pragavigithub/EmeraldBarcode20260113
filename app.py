@@ -1,6 +1,7 @@
 import os
 import logging
 from flask import Flask
+from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from sqlalchemy.orm import DeclarativeBase
@@ -29,6 +30,12 @@ login_manager = LoginManager()
 
 # Create Flask app
 app = Flask(__name__)
+CORS(app, resources={
+    r"/api/*": {
+        "origins": "*",
+        "supports_credentials": True
+    }
+})
 
 # Setup comprehensive logging to C:\tmp\wms_logs
 try:
