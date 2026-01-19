@@ -417,12 +417,12 @@ function updateTransferLinesDisplay() {
         const serialsArray = line.serialNumbers.map(sn => sn.InternalSerialNumber || sn);
         const serialsDisplay = `
             <div class="d-flex align-items-center">
-                <button type="button" class="btn btn-sm btn-info rounded-pill me-2" 
+                <button type="button" class="btn btn-sm btn-info rounded-pill me-2 px-3" 
                         onclick="viewSerials('${line.ItemCode}', ${JSON.stringify(serialsArray).replace(/"/g, '&quot;')})">
                     ${serialsArray[0]}
-                    ${serialsArray.length > 1 ? `<span class="ms-1">(+${serialsArray.length - 1})</span>` : ''}
+                    ${serialsArray.length > 1 ? `<span class="ms-1 fw-bold">(+${serialsArray.length - 1})</span>` : ''}
                 </button>
-                <small class="text-muted">${serialsArray.length} serial(s)</small>
+                <span class="badge bg-light text-dark border">${serialsArray.length} serial(s)</span>
             </div>
         `;
         

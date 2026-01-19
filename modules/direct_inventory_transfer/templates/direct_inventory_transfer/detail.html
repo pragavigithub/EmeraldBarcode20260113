@@ -181,14 +181,14 @@
                             <td>
                                 {% if item.item_type == 'serial' and sns %}
                                     <div class="d-flex align-items-center">
-                                        <button type="button" class="btn btn-sm btn-info rounded-pill me-2" 
+                                        <button type="button" class="btn btn-sm btn-info rounded-pill me-2 px-3" 
                                                 onclick="viewSerials('{{ item.item_code }}', {{ sns|tojson|safe }})">
                                             {{ sns[0] }}
                                             {% if sns|length > 1 %}
-                                                <span class="ms-1">(+{{ sns|length - 1 }})</span>
+                                                <span class="ms-1 fw-bold">(+{{ sns|length - 1 }})</span>
                                             {% endif %}
                                         </button>
-                                        <small class="text-muted">{{ sns|length }} serial(s)</small>
+                                        <span class="badge bg-light text-dark border">{{ sns|length }} serial(s)</span>
                                     </div>
                                 {% elif item.item_type == 'batch' and item.batch_number %}
                                     <span class="badge bg-warning">{{ item.batch_number }}</span>
