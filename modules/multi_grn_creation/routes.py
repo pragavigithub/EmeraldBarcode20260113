@@ -631,7 +631,9 @@ def create_step3_select_lines(batch_id):
         db.session.commit()
         logging.info(f"✅ Line items selected for batch {batch_id}")
         flash('Line items selected successfully', 'success')
-        # Stay on Step 3 to allow detail entry
+        
+        # After selection, redirect to Step 3 details page
+        # Note: The GET handler uses has_lines to determine which template to show
         return redirect(url_for('multi_grn.create_step3_select_lines', batch_id=batch_id))
 
     def wants_json():
