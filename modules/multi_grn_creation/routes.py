@@ -639,6 +639,18 @@ def create_step3_select_lines(batch_id):
     # GET request
     has_lines = any(po_link.line_selections for po_link in batch.po_links)
 
+    po_details = []
+    sap_service = SAPMultiGRNService()
+    for po_link in batch.po_links:
+        # Fetch lines from SAP for this PO
+        lines_result = sap_service.fetch_po_lines_by_docentry(po_link.po_doc_entry)
+        if lines_result['success']:
+            po_details.append({
+                'po_id': po_link.id,
+                'po_num': po_link.po_doc_num,
+                'lines': lines_result['po_lines']
+            })
+
     if has_lines:
 
         if wants_json():
