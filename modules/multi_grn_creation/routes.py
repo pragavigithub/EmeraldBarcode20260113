@@ -645,10 +645,12 @@ def create_step3_select_lines(batch_id):
         # Fetch lines from SAP for this PO
         lines_result = sap_service.fetch_po_lines_by_docentry(po_link.po_doc_entry)
         if lines_result['success']:
+            po_data = lines_result.get('purchase_order', {})
+            po_lines = po_data.get('OpenLines', [])
             po_details.append({
                 'po_id': po_link.id,
                 'po_num': po_link.po_doc_num,
-                'lines': lines_result['po_lines']
+                'lines': po_lines
             })
 
     if has_lines:
