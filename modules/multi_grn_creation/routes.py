@@ -639,10 +639,18 @@ def create_step3_select_lines(batch_id):
     def wants_json():
         return request.headers.get('Accept') == 'application/json' or request.is_json
     # GET request
-    has_lines = any(po_link.line_selections for po_link in batch.po_links)
+    # Check for saved line selections
+    saved_lines_count = db.session.query(MultiGRNLineSelection).join(MultiGRNPOLink).filter(MultiGRNPOLink.batch_id == batch.id).count()
+    has_lines = saved_lines_count > 0
 
     po_details = []
     sap_service = SAPMultiGRNService()
+    
+    # If we have lines, we show the detail entry screen
+    if has_lines:
+        return render_template('multi_grn/step3_detail.html', batch=batch)
+        
+    # Otherwise, fetch lines from SAP for the selection screen
     for po_link in batch.po_links:
         # Fetch lines from SAP for this PO
         lines_result = sap_service.fetch_po_lines_by_docentry(po_link.po_doc_entry)
@@ -655,89 +663,14 @@ def create_step3_select_lines(batch_id):
                 'lines': po_lines
             })
 
-    if has_lines:
+    if wants_json():
+        return jsonify({
+            "batch_id": batch.id,
+            "has_lines": False,
+            "po_details": po_details
+        })
 
-        if wants_json():
-            return jsonify({
-                "batch_id": batch.id,
-                "has_lines": True,
-                "lines": [
-                    {
-                        "po_link_id": l.po_link_id,
-                        "po_line_num": l.po_line_num,
-                        "item_code": l.item_code,
-                        "item_description": l.item_description,
-                        "selected_quantity": str(l.selected_quantity),
-                        "warehouse": l.warehouse_code,
-                        "batch_required": l.batch_required,
-                        "serial_required": l.serial_required
-                    }
-                    for po in batch.po_links for l in po.line_selections
-                ]
-            })
-
-        return render_template('multi_grn/step3_detail.html', batch=batch)
-
-    else:
-        sap_service = SAPMultiGRNService()
-        po_details = []
-
-        for po_link in batch.po_links:
-            result = sap_service.fetch_po_lines_by_docentry(po_link.po_doc_entry)
-
-            if not result.get('success'):
-                msg = result.get('error', 'Failed to fetch Purchase Order details from SAP')
-                if wants_json():
-                    return jsonify({"success": False, "error": msg}), 500
-                flash(f'Error loading PO details: {msg}', 'error')
-                return redirect(url_for('multi_grn.index'))
-
-            po_details.append({
-                'po_link_id': po_link.id,
-                'po_doc_entry': po_link.po_doc_entry,
-                'lines': result['purchase_order'].get('OpenLines', [])
-            })
-
-        if wants_json():
-            return jsonify({
-                "batch_id": batch.id,
-                "has_lines": False,
-                "purchase_orders": po_details
-            })
-
-        return render_template('multi_grn/step3_select_lines.html', batch=batch, po_details=po_details)
-
-    # # GET request - check if lines already exist
-    # has_lines = any(po_link.line_selections for po_link in batch.po_links)
-    #
-    # if has_lines:
-    #     # Lines already selected, show detail entry view
-    #     return render_template('multi_grn/step3_detail.html', batch=batch)
-    # else:
-    #     # No lines selected yet, show line selection view
-    #     sap_service = SAPMultiGRNService()
-    #     po_details = []
-    #
-    #     for po_link in batch.po_links:
-    #         # Use $crossjoin method to fetch PO lines by DocEntry
-    #         result = sap_service.fetch_po_lines_by_docentry(po_link.po_doc_entry)
-    #         logging.info(f"📊 Step 3 - Fetched PO lines using $crossjoin for DocEntry {po_link.po_doc_entry}: Success={result.get('success')}")
-    #
-    #         # Handle both success/failure cases safely
-    #         if result.get('success'):
-    #             po_data = result.get('purchase_order', {})
-    #             po_details.append({
-    #                 'po_link': po_link,
-    #                 'lines': po_data.get('OpenLines', [])
-    #             })
-    #         else:
-    #             # SAP login failed - show error to user
-    #             error_msg = result.get('error', 'Failed to fetch Purchase Order details from SAP')
-    #             logging.error(f"❌ Step 3 error for batch {batch_id}: {error_msg}")
-    #             flash(f'Error loading PO details: {error_msg}', 'error')
-    #             return redirect(url_for('multi_grn.index'))
-    #
-    #     return render_template('multi_grn/step3_select_lines.html', batch=batch, po_details=po_details)
+    return render_template('multi_grn/step3_select_lines.html', batch=batch, po_details=po_details)
 
 @multi_grn_bp.route('/create/step4/<int:batch_id>')
 @login_required
