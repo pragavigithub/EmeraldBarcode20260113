@@ -76,7 +76,6 @@ def index():
                            status_filter=status_filter,
                            current_user=current_user)
 
-
 @direct_inventory_transfer_bp.route('/create', methods=['GET', 'POST'])
 @login_required
 def create():
@@ -87,67 +86,106 @@ def create():
 
     if request.method == 'POST':
         try:
+            # -------------------------------
+            # JSON OR FORM DETECTION
+            # -------------------------------
+            is_json_request = request.is_json or 'application/json' in request.headers.get('Content-Type', '')
+            print("is_json_request---->",is_json_request)
+            data = request.get_json() if is_json_request else request.form
+            print("data--->",data)
             transfer_number = generate_direct_transfer_number()
             print("transfer_number--->", transfer_number)
-            item_code = request.form.get('item_code', '').strip()
-            item_type = request.form.get('item_type', 'none')
-            quantity = float(request.form.get('quantity', 1))
-            from_warehouse = request.form.get('from_warehouse')
-            to_warehouse = request.form.get('to_warehouse')
-            from_bin = request.form.get('from_bin', '')
-            to_bin = request.form.get('to_bin', '')
-            notes = request.form.get('notes', '')
-            serial_numbers_str = request.form.get('serial_numbers', '').strip()
-            batch_number = request.form.get('batch_number', '').strip()
 
+            # -------------------------------
+            # READ INPUT (FORM + JSON)
+            # -------------------------------
+            item_code = (data.get('item_code') or '').strip()
+            item_type = data.get('item_type', 'none')
+            quantity = float(data.get('quantity', 1))
+            from_warehouse = data.get('from_warehouse')
+            to_warehouse = data.get('to_warehouse')
+            from_bin = data.get('from_bin', '')
+            to_bin = data.get('to_bin', '')
+            notes = data.get('notes', '')
+            serial_numbers_str = (data.get('serial_numbers') or '').strip()
+            batch_number = (data.get('batch_number') or '').strip()
+
+            # -------------------------------
+            # BASIC VALIDATIONS
+            # -------------------------------
             if not all([item_code, from_warehouse, to_warehouse]):
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
-                    return jsonify({'success': False, 'error': 'Item Code, From Warehouse and To Warehouse are required'}), 400
-                flash('Item Code, From Warehouse and To Warehouse are required', 'error')
+                msg = 'Item Code, From Warehouse and To Warehouse are required'
+                if is_json_request:
+                    return jsonify({'success': False, 'error': msg}), 400
+                flash(msg, 'error')
                 return render_template('direct_inventory_transfer/create.html')
 
             if from_warehouse == to_warehouse:
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
-                    return jsonify({'success': False, 'error': 'From Warehouse and To Warehouse must be different'}), 400
-                flash('From Warehouse and To Warehouse must be different', 'error')
+                msg = 'From Warehouse and To Warehouse must be different'
+                if is_json_request:
+                    return jsonify({'success': False, 'error': msg}), 400
+                flash(msg, 'error')
                 return render_template('direct_inventory_transfer/create.html')
 
+            # -------------------------------
+            # SAP LOGIN
+            # -------------------------------
             sap = SAPIntegration()
             if not sap.ensure_logged_in():
-                flash('SAP B1 authentication failed', 'error')
+                msg = 'SAP B1 authentication failed'
+                if is_json_request:
+                    return jsonify({'success': False, 'error': msg}), 500
+                flash(msg, 'error')
                 return render_template('direct_inventory_transfer/create.html')
 
+            # -------------------------------
+            # ITEM VALIDATION
+            # -------------------------------
             validation_result = sap.validate_item_for_direct_transfer(item_code)
-            
             if not validation_result.get('valid'):
-                flash(f'Item validation failed: {validation_result.get("error", "Unknown error")}', 'error')
+                msg = f'Item validation failed: {validation_result.get("error", "Unknown error")}'
+                if is_json_request:
+                    return jsonify({'success': False, 'error': msg}), 400
+                flash(msg, 'error')
                 return render_template('direct_inventory_transfer/create.html')
 
             item_type_validated = validation_result.get('item_type', 'none')
             is_serial_managed = validation_result.get('is_serial_managed', False)
             is_batch_managed = validation_result.get('is_batch_managed', False)
 
-            serial_numbers_json = None
+            # -------------------------------
+            # SERIAL / BATCH VALIDATION
+            # -------------------------------
             serial_numbers_list = []
-            
+
             if is_serial_managed:
                 if not serial_numbers_str:
-                    flash('Serial numbers are required for serial-managed items', 'error')
-                    return render_template('direct_inventory_transfer/create.html')
-                
-                serial_numbers_list = [sn.strip() for sn in serial_numbers_str.split(',') if sn.strip()]
-                
-                if len(serial_numbers_list) != int(quantity):
-                    flash(f'Number of serial numbers ({len(serial_numbers_list)}) must match quantity ({int(quantity)})', 'error')
-                    return render_template('direct_inventory_transfer/create.html')
-                
-                serial_numbers_json = json.dumps(serial_numbers_list)
-            
-            elif is_batch_managed:
-                if not batch_number:
-                    flash('Batch number is required for batch-managed items', 'error')
+                    msg = 'Serial numbers are required for serial-managed items'
+                    if is_json_request:
+                        return jsonify({'success': False, 'error': msg}), 400
+                    flash(msg, 'error')
                     return render_template('direct_inventory_transfer/create.html')
 
+                serial_numbers_list = [sn.strip() for sn in serial_numbers_str.split(',') if sn.strip()]
+
+                if len(serial_numbers_list) != int(quantity):
+                    msg = f'Number of serial numbers ({len(serial_numbers_list)}) must match quantity ({int(quantity)})'
+                    if is_json_request:
+                        return jsonify({'success': False, 'error': msg}), 400
+                    flash(msg, 'error')
+                    return render_template('direct_inventory_transfer/create.html')
+
+            elif is_batch_managed:
+                if not batch_number:
+                    msg = 'Batch number is required for batch-managed items'
+                    if is_json_request:
+                        return jsonify({'success': False, 'error': msg}), 400
+                    flash(msg, 'error')
+                    return render_template('direct_inventory_transfer/create.html')
+
+            # -------------------------------
+            # CREATE TRANSFER HEADER
+            # -------------------------------
             transfer = DirectInventoryTransfer(
                 transfer_number=transfer_number,
                 user_id=current_user.id,
@@ -160,10 +198,12 @@ def create():
             )
 
             db.session.add(transfer)
-            db.session.flush()
+            db.session.flush()  # get transfer.id
 
+            # -------------------------------
+            # CREATE TRANSFER ITEMS
+            # -------------------------------
             if is_serial_managed:
-                serial_numbers_list = [sn.strip() for sn in serial_numbers_str.split(',') if sn.strip()]
                 for serial in serial_numbers_list:
                     transfer_item = DirectInventoryTransferItem(
                         direct_inventory_transfer_id=transfer.id,
@@ -201,21 +241,176 @@ def create():
                 )
                 db.session.add(transfer_item)
 
+            # -------------------------------
+            # COMMIT
+            # -------------------------------
             db.session.commit()
 
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
-                return redirect(url_for('direct_inventory_transfer.detail', transfer_id=transfer.id))
-            
+            # -------------------------------
+            # RESPONSE
+            # -------------------------------
+            if is_json_request:
+                return jsonify({
+                    'success': True,
+                    'transfer_id': transfer.id,
+                    'transfer_number': transfer_number
+                }), 201
+
             flash(f'Direct Inventory Transfer {transfer_number} created successfully with item {item_code}', 'success')
             return redirect(url_for('direct_inventory_transfer.detail', transfer_id=transfer.id))
-            
+
         except Exception as e:
             db.session.rollback()
             logging.error(f"Error creating direct inventory transfer: {str(e)}")
+
+            if request.is_json:
+                return jsonify({'success': False, 'error': str(e)}), 500
+
             flash(f'Error creating transfer: {str(e)}', 'error')
             return render_template('direct_inventory_transfer/create.html')
 
     return render_template('direct_inventory_transfer/create.html')
+
+
+# @direct_inventory_transfer_bp.route('/create', methods=['GET', 'POST'])
+# @login_required
+# def create():
+#     """Create new Direct Inventory Transfer with first item included"""
+#     if not current_user.has_permission('direct_inventory_transfer'):
+#         flash('Access denied - Direct Inventory Transfer permissions required', 'error')
+#         return redirect(url_for('dashboard'))
+#
+#     if request.method == 'POST':
+#         try:
+#             transfer_number = generate_direct_transfer_number()
+#             print("transfer_number--->", transfer_number)
+#             item_code = request.form.get('item_code', '').strip()
+#             item_type = request.form.get('item_type', 'none')
+#             quantity = float(request.form.get('quantity', 1))
+#             from_warehouse = request.form.get('from_warehouse')
+#             to_warehouse = request.form.get('to_warehouse')
+#             from_bin = request.form.get('from_bin', '')
+#             to_bin = request.form.get('to_bin', '')
+#             notes = request.form.get('notes', '')
+#             serial_numbers_str = request.form.get('serial_numbers', '').strip()
+#             batch_number = request.form.get('batch_number', '').strip()
+#
+#             if not all([item_code, from_warehouse, to_warehouse]):
+#                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+#                     return jsonify({'success': False, 'error': 'Item Code, From Warehouse and To Warehouse are required'}), 400
+#                 flash('Item Code, From Warehouse and To Warehouse are required', 'error')
+#                 return render_template('direct_inventory_transfer/create.html')
+#
+#             if from_warehouse == to_warehouse:
+#                 if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+#                     return jsonify({'success': False, 'error': 'From Warehouse and To Warehouse must be different'}), 400
+#                 flash('From Warehouse and To Warehouse must be different', 'error')
+#                 return render_template('direct_inventory_transfer/create.html')
+#
+#             sap = SAPIntegration()
+#             if not sap.ensure_logged_in():
+#                 flash('SAP B1 authentication failed', 'error')
+#                 return render_template('direct_inventory_transfer/create.html')
+#
+#             validation_result = sap.validate_item_for_direct_transfer(item_code)
+#
+#             if not validation_result.get('valid'):
+#                 flash(f'Item validation failed: {validation_result.get("error", "Unknown error")}', 'error')
+#                 return render_template('direct_inventory_transfer/create.html')
+#
+#             item_type_validated = validation_result.get('item_type', 'none')
+#             is_serial_managed = validation_result.get('is_serial_managed', False)
+#             is_batch_managed = validation_result.get('is_batch_managed', False)
+#
+#             serial_numbers_json = None
+#             serial_numbers_list = []
+#
+#             if is_serial_managed:
+#                 if not serial_numbers_str:
+#                     flash('Serial numbers are required for serial-managed items', 'error')
+#                     return render_template('direct_inventory_transfer/create.html')
+#
+#                 serial_numbers_list = [sn.strip() for sn in serial_numbers_str.split(',') if sn.strip()]
+#
+#                 if len(serial_numbers_list) != int(quantity):
+#                     flash(f'Number of serial numbers ({len(serial_numbers_list)}) must match quantity ({int(quantity)})', 'error')
+#                     return render_template('direct_inventory_transfer/create.html')
+#
+#                 serial_numbers_json = json.dumps(serial_numbers_list)
+#
+#             elif is_batch_managed:
+#                 if not batch_number:
+#                     flash('Batch number is required for batch-managed items', 'error')
+#                     return render_template('direct_inventory_transfer/create.html')
+#
+#             transfer = DirectInventoryTransfer(
+#                 transfer_number=transfer_number,
+#                 user_id=current_user.id,
+#                 from_warehouse=from_warehouse,
+#                 to_warehouse=to_warehouse,
+#                 from_bin=from_bin,
+#                 to_bin=to_bin,
+#                 notes=notes,
+#                 status='draft'
+#             )
+#
+#             db.session.add(transfer)
+#             db.session.flush()
+#
+#             if is_serial_managed:
+#                 serial_numbers_list = [sn.strip() for sn in serial_numbers_str.split(',') if sn.strip()]
+#                 for serial in serial_numbers_list:
+#                     transfer_item = DirectInventoryTransferItem(
+#                         direct_inventory_transfer_id=transfer.id,
+#                         item_code=validation_result.get('item_code'),
+#                         item_description=validation_result.get('item_description'),
+#                         barcode=item_code,
+#                         item_type=item_type_validated,
+#                         quantity=1.0,
+#                         from_warehouse_code=from_warehouse,
+#                         to_warehouse_code=to_warehouse,
+#                         from_bin_code=from_bin,
+#                         to_bin_code=to_bin,
+#                         batch_number=None,
+#                         serial_numbers=json.dumps([serial]),
+#                         validation_status='validated',
+#                         qc_status='pending'
+#                     )
+#                     db.session.add(transfer_item)
+#             else:
+#                 transfer_item = DirectInventoryTransferItem(
+#                     direct_inventory_transfer_id=transfer.id,
+#                     item_code=validation_result.get('item_code'),
+#                     item_description=validation_result.get('item_description'),
+#                     barcode=item_code,
+#                     item_type=item_type_validated,
+#                     quantity=quantity,
+#                     from_warehouse_code=from_warehouse,
+#                     to_warehouse_code=to_warehouse,
+#                     from_bin_code=from_bin,
+#                     to_bin_code=to_bin,
+#                     batch_number=batch_number if is_batch_managed else None,
+#                     serial_numbers=None,
+#                     validation_status='validated',
+#                     qc_status='pending'
+#                 )
+#                 db.session.add(transfer_item)
+#
+#             db.session.commit()
+#
+#             if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'application/json' in request.headers.get('Accept', ''):
+#                 return redirect(url_for('direct_inventory_transfer.detail', transfer_id=transfer.id))
+#
+#             flash(f'Direct Inventory Transfer {transfer_number} created successfully with item {item_code}', 'success')
+#             return redirect(url_for('direct_inventory_transfer.detail', transfer_id=transfer.id))
+#
+#         except Exception as e:
+#             db.session.rollback()
+#             logging.error(f"Error creating direct inventory transfer: {str(e)}")
+#             flash(f'Error creating transfer: {str(e)}', 'error')
+#             return render_template('direct_inventory_transfer/create.html')
+#
+#     return render_template('direct_inventory_transfer/create.html')
 
 
 @direct_inventory_transfer_bp.route('/<int:transfer_id>', methods=['GET'])
