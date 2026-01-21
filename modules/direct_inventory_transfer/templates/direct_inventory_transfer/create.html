@@ -11,141 +11,91 @@
         </a>
     </div>
 
-    <!-- Create Transfer Form -->
-    <div class="card shadow">
+    <!-- Step 1: Warehouse and Bin Selection -->
+    <div class="card shadow mb-4">
         <div class="card-header py-3">
-            <h6 class="breadcrumb-item active">
-                <i class="fas fa-barcode"></i> Step 1: Scan Barcode / Enter Item Code
+            <h6 class="m-0 font-weight-bold text-primary">
+                <i class="fas fa-warehouse"></i> Step 1: Choose Warehouses and Bin Locations
             </h6>
         </div>
         <div class="card-body">
             <form id="createTransferForm">
-                <!-- Step 1: Barcode Scanning / Serial Search -->
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <label for="serial_number_search" class="form-label">Serial Number <span class="text-danger">*</span></label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="serial_number_search" name="serial_number_search"
-                                   placeholder="Enter Serial Number (e.g. RLM40)" autofocus required>
-                            <button type="button" class="btn btn-primary" id="btnSearchSerial">
-                                <i class="fas fa-search"></i> Search
-                            </button>
-                        </div>
-                        <small class="text-muted">Enter serial number to fetch item details and current location</small>
+                        <label for="from_warehouse" class="form-label">From Warehouse <span class="text-danger">*</span></label>
+                        <select class="form-select" id="from_warehouse" name="from_warehouse" required>
+                            <option value="">Select From Warehouse</option>
+                        </select>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">Item Description</label>
-                        <input type="text" class="form-control" id="item_description" readonly>
+                        <label for="from_bin" class="form-label">From Bin Location</label>
+                        <select class="form-select" id="from_bin" name="from_bin">
+                            <option value="">Select From Bin (Optional)</option>
+                        </select>
+                        <small class="text-muted">Select warehouse first to load bin locations</small>
                     </div>
                 </div>
 
                 <div class="row">
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label">Item Code</label>
-                        <input type="text" class="form-control" id="item_code_display" readonly>
-                        <input type="hidden" id="item_code" name="item_code">
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label">Quantity</label>
-                        <input type="number" class="form-control" id="quantity" name="quantity" value="1" readonly>
+                    <div class="col-md-6 mb-3">
+                        <label for="to_warehouse" class="form-label">To Warehouse <span class="text-danger">*</span></label>
+                        <select class="form-select" id="to_warehouse" name="to_warehouse" required>
+                            <option value="">Select To Warehouse</option>
+                        </select>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">Current Location (Whs - Bin)</label>
-                        <input type="text" class="form-control" id="current_location_display" readonly>
-                        <input type="hidden" id="bpl_id" name="bpl_id">
+                        <label for="to_bin" class="form-label">To Bin Location</label>
+                        <select class="form-select" id="to_bin" name="to_bin">
+                            <option value="">Select To Bin (Optional)</option>
+                        </select>
+                        <small class="text-muted">Select warehouse first to load bin locations</small>
                     </div>
                 </div>
 
-                <hr class="my-4">
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Notes</label>
+                    <textarea class="form-control" id="notes" name="notes" rows="3" 
+                              placeholder="Enter any notes or comments for this transfer"></textarea>
+                </div>
 
-                <!-- Step 2: Warehouse Selection -->
-                <div id="warehouseSection" style="display: none;">
-                    <div class="card-header py-3 mb-3">
-                        <h6 class="breadcrumb-item active">
-                            <i class="fas fa-warehouse"></i> Step 2: Select Destination
-                        </h6>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="from_warehouse" class="form-label">From Warehouse</label>
-                            <input type="text" class="form-control" id="from_warehouse_display" readonly>
-                            <input type="hidden" id="from_warehouse" name="from_warehouse">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="to_warehouse" class="form-label">To Warehouse <span class="text-danger">*</span></label>
-                            <select class="form-select" id="to_warehouse" name="to_warehouse" required>
-                                <option value="">Select To Warehouse</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="from_bin" class="form-label">From Bin</label>
-                            <input type="text" class="form-control" id="from_bin_display" readonly>
-                            <input type="hidden" id="from_bin" name="from_bin">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="to_bin" class="form-label">To Bin (Optional)</label>
-                            <select class="form-select" id="to_bin" name="to_bin">
-                                <option value="">Select To Bin Location</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="comments" class="form-label">Comments</label>
-                        <textarea class="form-control" id="comments" name="comments" rows="3"
-                                  placeholder="Enter any notes or comments"></textarea>
-                    </div>
-
-                    <!-- Transfer Lines Section -->
-                    <div class="card mt-4">
-                        <div class="card-header">
-                            <h6 class="mb-0"><i class="fas fa-list"></i> Transfer Line Items</h6>
-                        </div>
-                        <div class="card-body">
-                            <div id="transferLinesContainer">
-                                <!-- Transfer lines will be added here -->
-                            </div>
-                            <div class="text-center mt-3">
-                                <button type="button" class="btn btn-success" id="btnAddLine">
-                                    <i class="fas fa-plus"></i> Add to Transfer Lines
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="text-end mt-4">
-                        <button type="button" class="btn btn-warning btn-lg me-2" id="btnSubmitForQC" style="display: none;">
-                            <i class="fas fa-check-circle"></i> Submit for QC Approval
-                        </button>
-                        <button type="button" class="btn btn-primary btn-lg" id="btnTransfer" style="display: none;">
-                            <i class="fas fa-exchange-alt"></i> Direct Transfer
-                        </button>
-                    </div>
+                <div class="text-end">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-plus"></i> Create Transfer Document
+                    </button>
                 </div>
             </form>
         </div>
     </div>
-</div>
 
-<!-- Serials Modal -->
-<div class="modal fade" id="serialsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="serialsModalTitle">Serial Numbers</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div id="serialsModalList" class="d-flex flex-wrap gap-2">
-                    <!-- Serials will be inserted here -->
+    <!-- Help Section -->
+    <div class="card shadow">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-info">
+                <i class="fas fa-info-circle"></i> Workflow Guide
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-primary">Step 1: Document Creation</h6>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-check text-success"></i> Choose From Warehouse</li>
+                        <li><i class="fas fa-check text-success"></i> Select From Bin (based on warehouse)</li>
+                        <li><i class="fas fa-check text-success"></i> Choose To Warehouse</li>
+                        <li><i class="fas fa-check text-success"></i> Select To Bin (based on warehouse)</li>
+                        <li><i class="fas fa-check text-success"></i> Create transfer document</li>
+                    </ul>
                 </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <div class="col-md-6">
+                    <h6 class="text-warning">Step 2: Serial Number Entry</h6>
+                    <ul class="list-unstyled">
+                        <li><i class="fas fa-arrow-right text-warning"></i> Enter serial numbers one by one</li>
+                        <li><i class="fas fa-arrow-right text-warning"></i> System validates each serial</li>
+                        <li><i class="fas fa-arrow-right text-warning"></i> Add serials to Transfer Items List</li>
+                        <li><i class="fas fa-arrow-right text-warning"></i> Submit for QC Approval</li>
+                        <li><i class="fas fa-arrow-right text-warning"></i> Document ready to Transfer</li>
+                    </ul>
+                </div>
             </div>
         </div>
     </div>
@@ -153,117 +103,36 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Direct Transfer Page Loaded');
+    console.log('Direct Transfer Create Page Loaded');
+    
+    // Load warehouses on page load
     loadWarehouses();
 
-    // Global variable to store transfer lines
-    window.transferLines = [];
-    window.currentLineIndex = 0;
-
-    document.getElementById('btnSearchSerial').addEventListener('click', function() {
-        searchSerial();
+    // Form submission
+    document.getElementById('createTransferForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        createTransferDocument();
     });
 
-    document.getElementById('serial_number_search').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            searchSerial();
+    // Warehouse change events to load bins
+    document.getElementById('from_warehouse').addEventListener('change', function() {
+        const warehouseCode = this.value;
+        if (warehouseCode) {
+            loadBinLocations(warehouseCode, 'from_bin');
+        } else {
+            clearBinOptions('from_bin');
         }
     });
 
     document.getElementById('to_warehouse').addEventListener('change', function() {
         const warehouseCode = this.value;
-        console.log('Warehouse changed to:', warehouseCode);
         if (warehouseCode) {
             loadBinLocations(warehouseCode, 'to_bin');
+        } else {
+            clearBinOptions('to_bin');
         }
     });
-
-    document.getElementById('btnAddLine').addEventListener('click', function() {
-        addTransferLine();
-    });
-
-    document.getElementById('btnTransfer').addEventListener('click', function() {
-        executeDirectTransfer();
-    });
-
-    document.getElementById('btnSubmitForQC').addEventListener('click', function() {
-        submitForQCApproval();
-    });
 });
-
-function searchSerial() {
-    const serial = document.getElementById('serial_number_search').value.trim();
-    if (!serial) {
-        showAlert('warning', 'Please enter a serial number');
-        return;
-    }
-
-    console.log('Searching for serial:', serial);
-    
-    // Show loading state
-    document.getElementById('btnSearchSerial').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching...';
-    document.getElementById('btnSearchSerial').disabled = true;
-    
-    fetch(`/direct-inventory-transfer/api/get-serial-location?serial_number=${encodeURIComponent(serial)}`)
-        .then(response => {
-            console.log('Response status:', response.status);
-            return response.json();
-        })
-        .then(data => {
-            console.log('Search response:', data);
-            if (data.success && data.value && data.value.length > 0) {
-                const item = data.value[0];
-                console.log('Item data:', item);
-                
-                document.getElementById('item_code').value = item.ItemCode;
-                document.getElementById('item_code_display').value = item.ItemCode;
-                document.getElementById('item_description').value = item.itemName;
-                document.getElementById('from_warehouse').value = item.WhsCode;
-                document.getElementById('from_warehouse_display').value = `${item.WhsName} (${item.WhsCode})`;
-                document.getElementById('current_location_display').value = `${item.WhsCode} - ${item.BinAbsEntry ? 'Bin: ' + item.BinAbsEntry : 'No Bin'}`;
-                document.getElementById('bpl_id').value = item.BPLid;
-
-                // Get bin code if BinAbsEntry exists
-                if (item.BinAbsEntry) {
-                    console.log('Getting bin code for AbsEntry:', item.BinAbsEntry);
-                    fetch(`/direct-inventory-transfer/api/get-bin-code?abs_entry=${item.BinAbsEntry}`)
-                        .then(response => response.json())
-                        .then(binData => {
-                            console.log('Bin response:', binData);
-                            if (binData.success && binData.value && binData.value.length > 0) {
-                                const bin = binData.value[0];
-                                document.getElementById('from_bin').value = bin.BinCode;
-                                document.getElementById('from_bin_display').value = bin.BinCode;
-                                document.getElementById('current_location_display').value = `${item.WhsCode} - ${bin.BinCode}`;
-                            }
-                        })
-                        .catch(error => {
-                            console.error('Error getting bin code:', error);
-                        });
-                } else {
-                    document.getElementById('from_bin').value = '';
-                    document.getElementById('from_bin_display').value = 'No Bin';
-                }
-
-                document.getElementById('warehouseSection').style.display = 'block';
-                showAlert('success', 'Serial number found!');
-            } else {
-                console.error('Serial not found or invalid response:', data);
-                showAlert('danger', data.error || 'Serial number not found');
-                resetForm();
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showAlert('danger', 'Error searching serial number: ' + error.message);
-        })
-        .finally(() => {
-            // Reset button state
-            document.getElementById('btnSearchSerial').innerHTML = '<i class="fas fa-search"></i> Search';
-            document.getElementById('btnSearchSerial').disabled = false;
-        });
-}
 
 function loadWarehouses() {
     console.log('Loading warehouses...');
@@ -272,418 +141,135 @@ function loadWarehouses() {
         .then(data => {
             console.log('Warehouse response:', data);
             if (data.success) {
+                const fromSelect = document.getElementById('from_warehouse');
                 const toSelect = document.getElementById('to_warehouse');
                 const warehouses = data.warehouses || data.value || [];
+                
+                // Clear existing options
+                fromSelect.innerHTML = '<option value="">Select From Warehouse</option>';
                 toSelect.innerHTML = '<option value="">Select To Warehouse</option>';
+                
                 warehouses.forEach(wh => {
                     const code = wh.WarehouseCode || wh.WhsCode || wh.Code;
                     const name = wh.WarehouseName || wh.WhsName || wh.Name;
-                    const option = new Option(`${name} (${code})`, code);
-                    toSelect.add(option);
+                    const optionText = `${name} (${code})`;
+                    
+                    fromSelect.add(new Option(optionText, code));
+                    toSelect.add(new Option(optionText, code));
                 });
+                
                 console.log(`Loaded ${warehouses.length} warehouses`);
             } else {
                 console.error('Failed to load warehouses:', data);
+                showAlert('danger', 'Failed to load warehouses: ' + (data.error || 'Unknown error'));
             }
         })
         .catch(error => {
             console.error('Error loading warehouses:', error);
+            showAlert('danger', 'Error loading warehouses: ' + error.message);
         });
 }
 
 function loadBinLocations(warehouseCode, selectId) {
     const binSelect = document.getElementById(selectId);
-    binSelect.innerHTML = '<option value="">Loading...</option>';
+    const isFromBin = selectId === 'from_bin';
+    
+    binSelect.innerHTML = '<option value="">Loading bins...</option>';
+    binSelect.disabled = true;
 
     console.log('Loading bins for warehouse:', warehouseCode);
     fetch(`/direct-inventory-transfer/api/get-bin-locations?warehouse_code=${encodeURIComponent(warehouseCode)}`)
         .then(response => response.json())
         .then(data => {
             console.log('Bin response:', data);
-            binSelect.innerHTML = '<option value="">Select To Bin Location</option>';
+            
+            const defaultText = isFromBin ? 'Select From Bin (Optional)' : 'Select To Bin (Optional)';
+            binSelect.innerHTML = `<option value="">${defaultText}</option>`;
+            
             const bins = data.bins || data.value || [];
-            if (data.success && bins) {
+            if (data.success && bins.length > 0) {
                 bins.forEach(bin => {
                     const option = new Option(bin.BinCode, bin.BinCode);
                     binSelect.add(option);
                 });
-                console.log(`Loaded ${bins.length} bins`);
+                console.log(`Loaded ${bins.length} bins for ${warehouseCode}`);
+                showAlert('info', `Loaded ${bins.length} bin locations for ${warehouseCode}`);
             } else {
-                console.error('Failed to load bins:', data);
+                console.log('No bins found for warehouse:', warehouseCode);
+                showAlert('info', `No bin locations found for warehouse ${warehouseCode}`);
             }
         })
         .catch(error => {
             console.error('Error loading bins:', error);
-            binSelect.innerHTML = '<option value="">Error loading bins</option>';
-        });
-}
-
-    function addTransferLine() {
-        const serial = document.getElementById('serial_number_search').value.trim();
-        const itemCode = document.getElementById('item_code').value;
-        const itemDescription = document.getElementById('item_description').value;
-        const fromWhs = document.getElementById('from_warehouse').value;
-        const toWhs = document.getElementById('to_warehouse').value;
-        const fromBin = document.getElementById('from_bin').value;
-        const toBin = document.getElementById('to_bin').value;
-        const bplId = document.getElementById('bpl_id').value;
-        const comments = document.getElementById('comments').value;
-
-        if (!serial || !itemCode || !fromWhs || !toWhs || !bplId) {
-            showAlert('warning', 'Please complete the serial search and warehouse selection first');
-            return;
-        }
-
-        const transferData = new FormData();
-        transferData.append('item_code', itemCode);
-        transferData.append('item_type', 'serial');
-        transferData.append('quantity', 1);
-        transferData.append('from_warehouse', fromWhs);
-        transferData.append('to_warehouse', toWhs);
-        transferData.append('from_bin', fromBin);
-        transferData.append('to_bin', toBin);
-        transferData.append('notes', comments);
-        transferData.append('serial_numbers', serial);
-
-        // Show loading state
-        const btnAddLine = document.getElementById('btnAddLine');
-        const originalText = btnAddLine.innerHTML;
-        btnAddLine.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
-        btnAddLine.disabled = true;
-
-        fetch('/direct-inventory-transfer/create', {
-            method: 'POST',
-            body: transferData
-        })
-        .then(response => {
-            if (response.redirected) {
-                window.location.href = response.url;
-            } else {
-                return response.json().then(data => {
-                    if (data.success) {
-                        showAlert('success', data.message || 'Item added successfully');
-                        // Refresh the page to show grouped serials in the detail view
-                        setTimeout(() => {
-                             if (data.transfer_id) {
-                                 window.location.href = `/direct-inventory-transfer/${data.transfer_id}`;
-                             } else {
-                                 location.reload();
-                             }
-                        }, 1000);
-                    } else {
-                        showAlert('danger', data.error || 'Error adding item');
-                    }
-                });
-            }
-        })
-        .catch(error => {
-            console.error('Error adding item:', error);
-            showAlert('danger', 'Error connecting to server');
+            binSelect.innerHTML = `<option value="">Error loading bins</option>`;
+            showAlert('warning', 'Error loading bin locations: ' + error.message);
         })
         .finally(() => {
-            btnAddLine.innerHTML = originalText;
-            btnAddLine.disabled = false;
+            binSelect.disabled = false;
         });
-    }
+}
 
-function updateTransferLinesDisplay() {
-    const container = document.getElementById('transferLinesContainer');
+function clearBinOptions(selectId) {
+    const binSelect = document.getElementById(selectId);
+    const isFromBin = selectId === 'from_bin';
+    const defaultText = isFromBin ? 'Select From Bin (Optional)' : 'Select To Bin (Optional)';
+    binSelect.innerHTML = `<option value="">${defaultText}</option>`;
+}
+
+function createTransferDocument() {
+    const formData = new FormData(document.getElementById('createTransferForm'));
     
-    if (window.transferLines.length === 0) {
-        container.innerHTML = '<p class="text-muted text-center">No transfer lines added yet</p>';
-        document.getElementById('btnTransfer').style.display = 'none';
-        document.getElementById('btnSubmitForQC').style.display = 'none';
+    // Validate required fields
+    const fromWarehouse = formData.get('from_warehouse');
+    const toWarehouse = formData.get('to_warehouse');
+    
+    if (!fromWarehouse || !toWarehouse) {
+        showAlert('warning', 'Please select both From and To warehouses');
         return;
     }
-
-    let html = `
-        <div class="table-responsive">
-            <table class="table table-bordered table-sm">
-                <thead class="table-primary">
-                    <tr>
-                        <th>Item Code</th>
-                        <th>Item Description</th>
-                        <th>Expected Qty</th>
-                        <th>Serial Numbers</th>
-                        <th>Validated</th>
-                        <th>From → To</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-
-    window.transferLines.forEach((line, index) => {
-        const serialsArray = line.serialNumbers.map(sn => sn.InternalSerialNumber || sn);
-        const serialsDisplay = `
-            <div class="d-flex align-items-center">
-                <button type="button" class="btn btn-sm btn-info rounded-pill me-2 px-3" 
-                        onclick="viewSerials('${line.ItemCode}', ${JSON.stringify(serialsArray).replace(/"/g, '&quot;')})">
-                    ${serialsArray[0]}
-                    ${serialsArray.length > 1 ? `<span class="ms-1 fw-bold">(+${serialsArray.length - 1})</span>` : ''}
-                </button>
-                <span class="badge bg-light text-dark border">${serialsArray.length} serial(s)</span>
-            </div>
-        `;
-        
-        html += `
-            <tr>
-                <td><strong>${line.ItemCode}</strong></td>
-                <td>${line.ItemDescription}</td>
-                <td>
-                    <span class="badge bg-primary">${line.Quantity} Serial(s)</span>
-                </td>
-                <td>${serialsDisplay}</td>
-                <td><span class="badge bg-success">✓</span></td>
-                <td>
-                    <span class="badge bg-secondary">${line.FromWarehouseCode}</span>
-                    →
-                    <span class="badge bg-success">${line.WarehouseCode}</span>
-                </td>
-                <td>
-                    <button class="btn btn-sm btn-outline-primary" onclick="manageLine(${index})">
-                        Manage
-                    </button>
-                </td>
-            </tr>
-        `;
-    });
-
-    html += `
-                </tbody>
-            </table>
-        </div>
-        <div class="mt-3">
-            <div class="row">
-                <div class="col-md-6">
-                    <strong>Total Items:</strong> ${window.transferLines.length}
-                </div>
-                <div class="col-md-6 text-end">
-                    <strong>Total Serials:</strong> ${window.transferLines.reduce((sum, line) => sum + line.Quantity, 0)}
-                </div>
-            </div>
-        </div>
-    `;
-
-    container.innerHTML = html;
     
-    // Show action buttons
-    document.getElementById('btnTransfer').style.display = 'inline-block';
-    document.getElementById('btnSubmitForQC').style.display = 'inline-block';
-}
-
-function manageLine(lineIndex) {
-    const line = window.transferLines[lineIndex];
-    const serialsList = line.serialNumbers.map(sn => sn.InternalSerialNumber).join(', ');
-    
-    if (confirm(`Remove line: ${line.ItemCode}\nSerials: ${serialsList}\n\nAre you sure?`)) {
-        window.transferLines.splice(lineIndex, 1);
-        // Renumber lines
-        window.transferLines.forEach((line, index) => {
-            line.LineNum = index;
-        });
-        updateTransferLinesDisplay();
-        showAlert('info', 'Transfer line removed');
-    }
-}
-
-function viewSerials(itemCode, serials) {
-    console.log('viewSerials called for:', itemCode, serials);
-    document.getElementById('serialsModalTitle').innerText = `Serial Numbers for ${itemCode}`;
-    const listContainer = document.getElementById('serialsModalList');
-    listContainer.innerHTML = '';
-    
-    if (typeof serials === 'string') {
-        try {
-            serials = JSON.parse(serials);
-        } catch (e) {
-            serials = serials.split(',').map(s => s.trim());
-        }
-    }
-    
-    if (Array.isArray(serials)) {
-        serials.forEach(sn => {
-            const span = document.createElement('span');
-            span.className = 'badge bg-info p-2';
-            span.innerText = sn;
-            listContainer.appendChild(span);
-        });
-    } else {
-        const span = document.createElement('span');
-        span.className = 'badge bg-info p-2';
-        span.innerText = serials;
-        listContainer.appendChild(span);
-    }
-    
-    const modalElement = document.getElementById('serialsModal');
-    let modal = bootstrap.Modal.getInstance(modalElement);
-    if (!modal) {
-        modal = new bootstrap.Modal(modalElement);
-    }
-    modal.show();
-}
-
-function clearSerialSearch() {
-    document.getElementById('serial_number_search').value = '';
-    document.getElementById('item_description').value = '';
-    document.getElementById('item_code_display').value = '';
-    document.getElementById('current_location_display').value = '';
-    document.getElementById('serial_number_search').focus();
-}
-
-function executeDirectTransfer() {
-    if (window.transferLines.length === 0) {
-        showAlert('warning', 'Please add at least one transfer line');
+    if (fromWarehouse === toWarehouse) {
+        showAlert('warning', 'From and To warehouses must be different');
         return;
     }
-
-    const comments = document.getElementById('comments').value;
-    const firstLine = window.transferLines[0];
-
-    // Construct the multi-line JSON payload
-    const payload = {
-        "DocDate": new Date().toISOString().split('T')[0],
-        "Comments": comments || `QC Approved WMS Transfer by ${getCurrentUser()}`,
-        "FromWarehouse": firstLine.FromWarehouseCode,
-        "ToWarehouse": firstLine.WarehouseCode,
-        "BPLID": firstLine.BPLId,
-        "StockTransferLines": window.transferLines.map(line => ({
-            "LineNum": line.LineNum,
-            "ItemCode": line.ItemCode,
-            "Quantity": line.Quantity,
-            "WarehouseCode": line.WarehouseCode,
-            "FromWarehouseCode": line.FromWarehouseCode,
-            "SerialNumbers": line.serialNumbers,
-            "BatchNumbers": [],
-            "StockTransferLinesBinAllocations": []
-        }))
-    };
-
-    console.log('Multi-line Transfer payload:', JSON.stringify(payload, null, 2));
 
     // Show loading state
-    const transferBtn = document.getElementById('btnTransfer');
-    const originalText = transferBtn.innerHTML;
-    transferBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
-    transferBtn.disabled = true;
+    const submitBtn = document.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Document...';
+    submitBtn.disabled = true;
 
-    // Send to the direct stock transfer API endpoint
-    fetch('/direct-inventory-transfer/api/post-stock-transfer', {
+    fetch('/direct-inventory-transfer/create', {
         method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        },
-        body: JSON.stringify(payload)
+        body: formData
     })
     .then(response => {
-        console.log('Response status:', response.status);
-        return response.json();
-    })
-    .then(data => {
-        console.log('Transfer response:', data);
-        if (data.success) {
-            const docNum = data.sap_doc_number || data.doc_num || 'Unknown';
-            showAlert('success', `Multi-line transfer completed successfully! SAP Document: ${docNum}`);
-            setTimeout(() => {
-                window.location.href = '/direct-inventory-transfer/';
-            }, 3000);
+        if (response.redirected) {
+            // Follow the redirect to the detail page
+            window.location.href = response.url;
         } else {
-            showAlert('danger', 'Transfer failed: ' + (data.error || 'Unknown error'));
+            return response.json().then(data => {
+                if (data.success) {
+                    showAlert('success', data.message || 'Transfer document created successfully');
+                    // Redirect to detail page for Step 2
+                    setTimeout(() => {
+                        window.location.href = `/direct-inventory-transfer/${data.transfer_id}`;
+                    }, 1500);
+                } else {
+                    showAlert('danger', data.error || 'Error creating transfer document');
+                }
+            });
         }
     })
     .catch(error => {
-        console.error('Transfer error:', error);
-        showAlert('danger', 'Error executing transfer: ' + error.message);
+        console.error('Error creating transfer:', error);
+        showAlert('danger', 'Error creating transfer document: ' + error.message);
     })
     .finally(() => {
         // Reset button state
-        transferBtn.innerHTML = originalText;
-        transferBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
     });
-}
-
-function submitForQCApproval() {
-    if (window.transferLines.length === 0) {
-        showAlert('warning', 'Please add at least one transfer line');
-        return;
-    }
-
-    const comments = document.getElementById('comments').value;
-    const firstLine = window.transferLines[0];
-
-    // Prepare data for QC submission
-    const qcData = {
-        comments: comments || `Multi-line transfer for QC approval by ${getCurrentUser()}`,
-        from_warehouse: firstLine.FromWarehouseCode,
-        to_warehouse: firstLine.WarehouseCode,
-        bpl_id: firstLine.BPLId,
-        transfer_lines: window.transferLines.map(line => ({
-            line_num: line.LineNum,
-            item_code: line.ItemCode,
-            item_description: line.ItemDescription,
-            quantity: line.Quantity,
-            warehouse_code: line.WarehouseCode,
-            from_warehouse_code: line.FromWarehouseCode,
-            from_bin: line.FromBin,
-            to_bin: line.ToBin,
-            serial_numbers: line.serialNumbers
-        }))
-    };
-
-    console.log('QC Submission data:', JSON.stringify(qcData, null, 2));
-
-    // Show loading state
-    const qcBtn = document.getElementById('btnSubmitForQC');
-    const originalText = qcBtn.innerHTML;
-    qcBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
-    qcBtn.disabled = true;
-
-    // Send to QC submission endpoint
-    fetch('/direct-inventory-transfer/api/submit-for-qc', {
-        method: 'POST',
-        headers: { 
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        },
-        body: JSON.stringify(qcData)
-    })
-    .then(response => {
-        console.log('QC Response status:', response.status);
-        return response.json();
-    })
-    .then(data => {
-        console.log('QC Submission response:', data);
-        if (data.success) {
-            showAlert('success', `Transfer submitted for QC approval! Transfer Number: ${data.transfer_number}`);
-            setTimeout(() => {
-                window.location.href = '/direct-inventory-transfer/';
-            }, 3000);
-        } else {
-            showAlert('danger', 'QC submission failed: ' + (data.error || 'Unknown error'));
-        }
-    })
-    .catch(error => {
-        console.error('QC submission error:', error);
-        showAlert('danger', 'Error submitting for QC: ' + error.message);
-    })
-    .finally(() => {
-        // Reset button state
-        qcBtn.innerHTML = originalText;
-        qcBtn.disabled = false;
-    });
-}
-
-function getCurrentUser() {
-    // Try to get current user name, fallback to 'admin'
-    return 'admin'; // You can enhance this to get actual user name
-}
-
-function resetForm() {
-    document.getElementById('warehouseSection').style.display = 'none';
-    document.getElementById('item_description').value = '';
-    document.getElementById('item_code_display').value = '';
-    document.getElementById('current_location_display').value = '';
 }
 
 function showAlert(type, message) {
@@ -693,9 +279,19 @@ function showAlert(type, message) {
     alertDiv.style.top = '20px';
     alertDiv.style.right = '20px';
     alertDiv.style.zIndex = '9999';
-    alertDiv.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+    alertDiv.style.minWidth = '300px';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
     document.body.appendChild(alertDiv);
-    setTimeout(() => alertDiv.remove(), 5000);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
 }
 </script>
 {% endblock %}

@@ -19,7 +19,9 @@
         <div class="col-md-8">
             <div class="card shadow">
                 <div class="card-header py-3">
-                    <h6 class="mb-0">Transfer Information</h6>
+                    <h6 class="mb-0">
+                        <i class="fas fa-info-circle"></i> Transfer Document Information
+                    </h6>
                 </div>
                 <div class="card-body">
                     <div class="row">
@@ -29,133 +31,130 @@
                         </div>
                         <div class="col-md-6">
                             {% if transfer.from_bin %}
-                            <p><strong>From Bin:</strong> {{ transfer.from_bin }}</p>
+                            <p><strong>From Bin:</strong> <span class="badge bg-secondary">{{ transfer.from_bin }}</span></p>
                             {% endif %}
                             {% if transfer.to_bin %}
-                            <p><strong>To Bin:</strong> {{ transfer.to_bin }}</p>
+                            <p><strong>To Bin:</strong> <span class="badge bg-secondary">{{ transfer.to_bin }}</span></p>
                             {% endif %}
                         </div>
                     </div>
                     {% if transfer.notes %}
                     <p><strong>Notes:</strong> {{ transfer.notes }}</p>
                     {% endif %}
+                    <p><strong>Created:</strong> {{ transfer.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
                 </div>
             </div>
         </div>
         <div class="col-md-4">
             <div class="card shadow">
                 <div class="card-header py-3">
-                    <h6 class="mb-0">Status</h6>
+                    <h6 class="mb-0">
+                        <i class="fas fa-chart-line"></i> Status & Progress
+                    </h6>
                 </div>
                 <div class="card-body">
-                    <p>
+                    <p><strong>Status:</strong>
                         {% if transfer.status == 'draft' %}
-                            <span class="badge bg-secondary">Draft</span>
+                            <span class="badge bg-secondary">Draft - Adding Serials</span>
                         {% elif transfer.status == 'submitted' %}
-                            <span class="badge bg-warning">Submitted</span>
+                            <span class="badge bg-warning">Submitted for QC</span>
                         {% elif transfer.status == 'qc_approved' %}
                             <span class="badge bg-success">QC Approved</span>
                         {% elif transfer.status == 'posted' %}
-                            <span class="badge bg-primary">Posted</span>
+                            <span class="badge bg-primary">Posted to SAP</span>
                         {% elif transfer.status == 'rejected' %}
                             <span class="badge bg-danger">Rejected</span>
                         {% endif %}
                     </p>
                     <p><strong>Total Items:</strong> {{ transfer.items|length }}</p>
+                    <p><strong>Total Serials:</strong> 
+                        {% set total_serials = transfer.items|sum(attribute='quantity') %}
+                        <span class="badge bg-info">{{ total_serials|int }}</span>
+                    </p>
                     {% if transfer.sap_document_number %}
-                    <p><strong>SAP Doc:</strong> {{ transfer.sap_document_number }}</p>
+                    <p><strong>SAP Document:</strong> <span class="badge bg-primary">{{ transfer.sap_document_number }}</span></p>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Add Item Form (only for draft status) -->
+    <!-- Step 2: Add Serial Numbers (only for draft status) -->
     {% if transfer.status == 'draft' %}
     <div class="card shadow mb-4">
         <div class="card-header py-3">
             <h6 class="mb-0">
-                <i class="fas fa-barcode"></i> Step 1: Scan Barcode / Enter Serial Number
+                <i class="fas fa-list"></i> Step 2: Enter Serial Numbers One by One
             </h6>
         </div>
         <div class="card-body">
-            <form id="addItemForm">
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label for="serial_number_search" class="form-label">Serial Number <span class="text-danger">*</span></label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="serial_number_search" name="serial_number_search" 
-                                   placeholder="Scan or enter serial number" autofocus required>
-                            <button type="button" class="btn btn-primary" id="btnSearchSerial">
-                                <i class="fas fa-search"></i> Search
-                            </button>
+            <div class="row">
+                <div class="col-md-8">
+                    <form id="addSerialForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="serial_number" class="form-label">Serial Number <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="serial_number" name="serial_number" 
+                                           placeholder="Scan or enter serial number" autofocus required>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-plus"></i> Add Serial
+                                    </button>
+                                </div>
+                                <small class="text-muted">System will validate serial and add to transfer items list</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Last Added Serial Info</label>
+                                <div id="lastSerialInfo" class="form-control bg-light" style="min-height: 38px;">
+                                    <span class="text-muted">No serials added yet</span>
+                                </div>
+                            </div>
                         </div>
-                        <small class="text-muted">Enter serial number to fetch item details</small>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label">Item Description</label>
-                        <input type="text" class="form-control" id="item_description_display" readonly>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <label class="form-label">Item Code</label>
-                        <input type="text" class="form-control" id="item_code_display" readonly>
-                        <input type="hidden" id="item_code" name="item_code">
-                        <input type="hidden" id="item_type" name="item_type" value="serial">
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <label for="quantity" class="form-label">Quantity</label>
-                        <input type="number" class="form-control" id="quantity" name="quantity" 
-                               value="1" readonly>
-                    </div>
+                    </form>
                 </div>
-
-                <div class="text-end">
-                    <button type="submit" class="btn btn-success" id="btnAddItem" disabled>
-                        <i class="fas fa-plus"></i> Add Item
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-    {% endif %}
-    
-    <!-- Serials Modal -->
-    <div class="modal fade" id="serialsModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="serialsModalTitle">Serial Numbers</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div id="serialsModalList" class="d-flex flex-wrap gap-2">
-                        <!-- Serials will be inserted here -->
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h6 class="card-title">Quick Stats</h6>
+                            <p class="mb-1"><strong>Items:</strong> <span id="itemCount">{{ transfer.items|length }}</span></p>
+                            <p class="mb-1"><strong>Serials:</strong> <span id="serialCount">{{ transfer.items|sum(attribute='quantity')|int }}</span></p>
+                            {% if transfer.items %}
+                            <button type="button" class="btn btn-success btn-sm mt-2" onclick="submitForQC()">
+                                <i class="fas fa-check-circle"></i> Submit for QC
+                            </button>
+                            {% endif %}
+                        </div>
                     </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
     </div>
+    {% endif %}
 
     <!-- Items Table -->
     <div class="card shadow">
-        <div class="card-header py-3">
-            <h6 class="mb-0">Transfer Items</h6>
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="mb-0">
+                <i class="fas fa-list"></i> Transfer Items List
+            </h6>
+            {% if transfer.status == 'draft' and transfer.items %}
+            <button type="button" class="btn btn-warning btn-sm" onclick="submitForQC()">
+                <i class="fas fa-check-circle"></i> Submit for QC Approval
+            </button>
+            {% endif %}
         </div>
         <div class="card-body">
             {% if transfer.items %}
             <div class="table-responsive">
-                <table class="table table-bordered" width="100%">
-                    <thead>
+                <table class="table table-bordered table-hover" width="100%">
+                    <thead class="table-primary">
                         <tr>
                             <th>Item Code</th>
                             <th>Description</th>
-                            <th>Type</th>
                             <th>Quantity</th>
-                            <th>Batch/Serial</th>
-                            <th>Status</th>
+                            <th>Serial Numbers</th>
+                            <th>Validation</th>
+                            <th>QC Status</th>
                             {% if transfer.status == 'draft' %}
                             <th>Actions</th>
                             {% endif %}
@@ -165,21 +164,13 @@
                         {% for item in transfer.items %}
                         {% set sns = (item.serial_numbers|from_json) if item.item_type == 'serial' and item.serial_numbers else [] %}
                         <tr id="item-{{ item.id }}">
-                            <td>{{ item.item_code }}</td>
+                            <td><strong>{{ item.item_code }}</strong></td>
                             <td>{{ item.item_description }}</td>
                             <td>
-                                {% if item.item_type == 'serial' %}
-                                    <span class="badge bg-warning" style="cursor: pointer;" 
-                                          onclick="viewSerials('{{ item.item_code }}', {{ sns|tojson|safe }})">Serial</span>
-                                {% elif item.item_type == 'batch' %}
-                                    <span class="badge bg-info">Batch</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">None</span>
-                                {% endif %}
+                                <span class="badge bg-primary">{{ item.quantity|int }} Serial(s)</span>
                             </td>
-                            <td>{{ item.quantity }}</td>
                             <td>
-                                {% if item.item_type == 'serial' and sns %}
+                                {% if sns %}
                                     <div class="d-flex align-items-center">
                                         <button type="button" class="btn btn-sm btn-info rounded-pill me-2 px-3" 
                                                 onclick="viewSerials('{{ item.item_code }}', {{ sns|tojson|safe }})">
@@ -190,26 +181,30 @@
                                         </button>
                                         <span class="badge bg-light text-dark border">{{ sns|length }} serial(s)</span>
                                     </div>
-                                {% elif item.item_type == 'batch' and item.batch_number %}
-                                    <span class="badge bg-warning">{{ item.batch_number }}</span>
                                 {% else %}
-                                    <span class="text-muted">-</span>
+                                    <span class="text-muted">No serials</span>
                                 {% endif %}
                             </td>
                             <td>
                                 {% if item.validation_status == 'validated' %}
-                                    <span class="badge bg-success">Validated</span>
+                                    <span class="badge bg-success"><i class="fas fa-check"></i> Validated</span>
                                 {% else %}
-                                    <span class="badge bg-danger">Failed</span>
+                                    <span class="badge bg-danger"><i class="fas fa-times"></i> Failed</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.qc_status == 'pending' %}
+                                    <span class="badge bg-warning">Pending</span>
+                                {% elif item.qc_status == 'approved' %}
+                                    <span class="badge bg-success">Approved</span>
+                                {% elif item.qc_status == 'rejected' %}
+                                    <span class="badge bg-danger">Rejected</span>
                                 {% endif %}
                             </td>
                             {% if transfer.status == 'draft' %}
                             <td>
-                                <button class="btn btn-sm btn-info me-1" onclick="editItem({{ item.id }}, '{{ item.item_type }}', {{ item.quantity }}, '{{ item.batch_number or '' }}', '{{ (item.serial_numbers|from_json)|join(',') if item.serial_numbers else '' }}')">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button class="btn btn-sm btn-danger" onclick="deleteItem({{ item.id }})">
-                                    <i class="fas fa-trash"></i>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteItem({{ item.id }})">
+                                    <i class="fas fa-trash"></i> Remove
                                 </button>
                             </td>
                             {% endif %}
@@ -218,22 +213,60 @@
                     </tbody>
                 </table>
             </div>
-
-            <!-- Submit Button -->
-            {% if transfer.status == 'draft' and transfer.items %}
-            <div class="text-end mt-3">
-                <button type="button" class="btn btn-primary" onclick="submitTransfer()">
-                    <i class="fas fa-paper-plane"></i> Submit for QC Approval
-                </button>
-            </div>
-            {% endif %}
             
             {% else %}
             <div class="text-center py-5">
-                <i class="fas fa-inbox fa-3x text-gray-300 mb-3"></i>
-                <p class="text-muted">No items added yet. Scan a barcode or enter an item code to add items.</p>
+                <i class="fas fa-barcode fa-3x text-gray-300 mb-3"></i>
+                <h5 class="text-muted">No Serial Numbers Added Yet</h5>
+                <p class="text-muted">Start by entering serial numbers one by one in the form above.</p>
+                {% if transfer.status == 'draft' %}
+                <p class="text-info">
+                    <i class="fas fa-info-circle"></i> 
+                    Each serial number will be validated and added to the transfer items list.
+                </p>
+                {% endif %}
             </div>
             {% endif %}
+        </div>
+    </div>
+
+    <!-- QC Notes (if rejected or approved) -->
+    {% if transfer.qc_notes %}
+    <div class="card shadow mt-4">
+        <div class="card-header py-3">
+            <h6 class="mb-0">
+                <i class="fas fa-comment"></i> QC Notes
+            </h6>
+        </div>
+        <div class="card-body">
+            <p>{{ transfer.qc_notes }}</p>
+            {% if transfer.qc_approved_at %}
+            <small class="text-muted">
+                QC reviewed on {{ transfer.qc_approved_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                {% if transfer.qc_approver %}by {{ transfer.qc_approver.username }}{% endif %}
+            </small>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Serials Modal -->
+<div class="modal fade" id="serialsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="serialsModalTitle">Serial Numbers</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="serialsModalList" class="d-flex flex-wrap gap-2">
+                    <!-- Serials will be inserted here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
         </div>
     </div>
 </div>
@@ -241,97 +274,80 @@
 <script>
 const transferId = {{ transfer.id }};
 
-document.getElementById('btnSearchSerial').addEventListener('click', function() {
-    searchSerial();
-});
+document.addEventListener('DOMContentLoaded', function() {
+    // Focus on serial input if in draft mode
+    {% if transfer.status == 'draft' %}
+    document.getElementById('serial_number').focus();
+    {% endif %}
 
-document.getElementById('serial_number_search').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
+    // Add serial form submission
+    document.getElementById('addSerialForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        searchSerial();
-    }
+        addSerial();
+    });
 });
 
-function searchSerial() {
-    const serial = document.getElementById('serial_number_search').value.trim();
+function addSerial() {
+    const serialInput = document.getElementById('serial_number');
+    const serial = serialInput.value.trim();
+    
     if (!serial) {
-        alert('Please enter a serial number');
+        showAlert('warning', 'Please enter a serial number');
         return;
     }
 
-    const searchBtn = document.getElementById('btnSearchSerial');
-    searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    searchBtn.disabled = true;
+    // Show loading state
+    const submitBtn = document.querySelector('#addSerialForm button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Adding...';
+    submitBtn.disabled = true;
 
-    fetch(`/direct-inventory-transfer/api/get-serial-location?serial_number=${encodeURIComponent(serial)}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.value && data.value.length > 0) {
-                const item = data.value[0];
-                document.getElementById('item_code').value = item.ItemCode;
-                document.getElementById('item_code_display').value = item.ItemCode;
-                document.getElementById('item_description_display').value = item.itemName;
-                document.getElementById('btnAddItem').disabled = false;
-                alert('Serial number found and validated!');
-            } else {
-                alert('Serial number not found or invalid');
-                resetAddItemForm();
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Error searching serial number');
-        })
-        .finally(() => {
-            searchBtn.innerHTML = '<i class="fas fa-search"></i> Search';
-            searchBtn.disabled = false;
-        });
-}
-
-function resetAddItemForm() {
-    document.getElementById('item_code').value = '';
-    document.getElementById('item_code_display').value = '';
-    document.getElementById('item_description_display').value = '';
-    document.getElementById('btnAddItem').disabled = true;
-}
-
-document.getElementById('addItemForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const serial = document.getElementById('serial_number_search').value.trim();
-    const itemCode = document.getElementById('item_code').value;
-    
-    if (!serial || !itemCode) {
-        alert('Please search and validate a serial number first');
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append('item_code', itemCode);
-    formData.append('item_type', 'serial');
-    formData.append('quantity', 1);
-    formData.append('serial_numbers', serial);
-
-    fetch(`/direct-inventory-transfer/${transferId}/add_item`, {
+    // Send request to add serial
+    fetch(`/direct-inventory-transfer/${transferId}/add_serial`, {
         method: 'POST',
-        body: formData
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            serial_number: serial
+        })
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            location.reload();
+            showAlert('success', data.message);
+            
+            // Update last serial info
+            document.getElementById('lastSerialInfo').innerHTML = `
+                <strong>${data.item_code}</strong> - ${data.item_description}<br>
+                <small class="text-muted">Location: ${data.current_location}</small>
+            `;
+            
+            // Clear input and focus
+            serialInput.value = '';
+            serialInput.focus();
+            
+            // Reload page to show updated items
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
         } else {
-            alert('Error: ' + data.error);
+            showAlert('danger', data.error || 'Error adding serial number');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error adding item');
+        showAlert('danger', 'Error connecting to server');
+    })
+    .finally(() => {
+        // Reset button state
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
     });
-});
+}
 
 function deleteItem(itemId) {
-    if (!confirm('Are you sure you want to delete this item?')) {
+    if (!confirm('Are you sure you want to remove this item and all its serial numbers?')) {
         return;
     }
 
@@ -341,73 +357,46 @@ function deleteItem(itemId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            showAlert('success', data.message);
             document.getElementById(`item-${itemId}`).remove();
+            
+            // Update counts
+            updateCounts();
         } else {
-            alert('Error: ' + data.error);
+            showAlert('danger', data.error || 'Error removing item');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error deleting item');
+        showAlert('danger', 'Error removing item');
     });
 }
 
-function editItem(itemId, itemType, quantity, batchNumber, serialNumbers) {
-    let newQty = prompt("Enter new quantity:", quantity);
-    if (newQty === null) return;
-    
-    let formData = new FormData();
-    formData.append('quantity', newQty);
-    
-    if (itemType === 'serial') {
-        let newSerials = prompt("Enter serial numbers (comma separated):", serialNumbers);
-        if (newSerials === null) return;
-        formData.append('serial_numbers', newSerials);
-    } else if (itemType === 'batch') {
-        let newBatch = prompt("Enter batch number:", batchNumber);
-        if (newBatch === null) return;
-        formData.append('batch_number', newBatch);
-    }
-    
-    fetch(`/direct-inventory-transfer/items/${itemId}/edit`, {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            alert(data.message);
-            location.reload();
-        } else {
-            alert('Error: ' + data.error);
-        }
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        alert('Error updating item');
-    });
-}
-
-function submitTransfer() {
-    if (!confirm('Are you sure you want to submit this transfer for QC approval?')) {
+function submitForQC() {
+    if (!confirm('Are you sure you want to submit this transfer for QC approval?\n\nOnce submitted, you cannot add more serial numbers.')) {
         return;
     }
 
-    fetch(`/direct-inventory-transfer/${transferId}/submit`, {
-        method: 'POST'
+    fetch(`/direct-inventory-transfer/${transferId}/submit_for_qc`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            alert(data.message);
-            location.reload();
+            showAlert('success', data.message);
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
         } else {
-            alert('Error: ' + data.error);
+            showAlert('danger', data.error || 'Error submitting for QC');
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('Error submitting transfer');
+        showAlert('danger', 'Error submitting for QC');
     });
 }
 
@@ -426,10 +415,10 @@ function viewSerials(itemCode, serials) {
     }
     
     if (Array.isArray(serials)) {
-        serials.forEach(sn => {
+        serials.forEach((sn, index) => {
             const span = document.createElement('span');
-            span.className = 'badge bg-info p-2';
-            span.innerText = sn;
+            span.className = 'badge bg-info p-2 me-1 mb-1';
+            span.innerText = `${index + 1}. ${sn}`;
             listContainer.appendChild(span);
         });
     } else {
@@ -445,6 +434,44 @@ function viewSerials(itemCode, serials) {
         modal = new bootstrap.Modal(modalElement);
     }
     modal.show();
+}
+
+function updateCounts() {
+    // Update item and serial counts
+    const itemRows = document.querySelectorAll('#itemsTableBody tr');
+    document.getElementById('itemCount').textContent = itemRows.length;
+    
+    let totalSerials = 0;
+    itemRows.forEach(row => {
+        const quantityBadge = row.querySelector('.badge.bg-primary');
+        if (quantityBadge) {
+            const qty = parseInt(quantityBadge.textContent.match(/\d+/)[0]);
+            totalSerials += qty;
+        }
+    });
+    document.getElementById('serialCount').textContent = totalSerials;
+}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.style.position = 'fixed';
+    alertDiv.style.top = '20px';
+    alertDiv.style.right = '20px';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.style.minWidth = '300px';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
 }
 </script>
 {% endblock %}

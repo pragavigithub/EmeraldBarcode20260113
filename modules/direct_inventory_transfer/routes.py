@@ -19,7 +19,6 @@ def generate_direct_transfer_number():
     """Generate unique transfer number for Direct Inventory Transfer"""
     return DocumentNumberSeries.get_next_number('DIRECT_INVENTORY_TRANSFER')
 
-
 @direct_inventory_transfer_bp.route('/', methods=['GET'])
 @login_required
 def index():
@@ -28,13 +27,22 @@ def index():
         flash('Access denied - Direct Inventory Transfer permissions required', 'error')
         return redirect(url_for('dashboard'))
 
+    # -------------------------------
+    # JSON OR HTML DETECTION
+    # -------------------------------
+    is_json_request = (
+        request.is_json or
+        'application/json' in request.headers.get('Content-Type', '') or
+        'application/json' in request.headers.get('Accept', '')
+    )
+
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     search_term = request.args.get('search', '').strip()
     from_date = request.args.get('from_date', '').strip()
     to_date = request.args.get('to_date', '').strip()
     status_filter = request.args.get('status', '').strip()
-    
+
     if per_page not in [5, 10, 25, 50, 100]:
         per_page = 10
 
@@ -53,33 +61,126 @@ def index():
                 DirectInventoryTransfer.notes.ilike(search_pattern)
             )
         )
-    
+
     if status_filter:
         query = query.filter(DirectInventoryTransfer.status == status_filter)
-    
+
     if from_date:
         query = query.filter(DirectInventoryTransfer.created_at >= from_date)
-    
+
     if to_date:
         query = query.filter(DirectInventoryTransfer.created_at <= f"{to_date} 23:59:59")
 
     query = query.order_by(DirectInventoryTransfer.created_at.desc())
     transfers_paginated = query.paginate(page=page, per_page=per_page, error_out=False)
 
-    return render_template('direct_inventory_transfer/index.html',
-                           transfers=transfers_paginated.items,
-                           pagination=transfers_paginated,
-                           per_page=per_page,
-                           search_term=search_term,
-                           from_date=from_date,
-                           to_date=to_date,
-                           status_filter=status_filter,
-                           current_user=current_user)
+    # -------------------------------
+    # JSON RESPONSE (FOR FLUTTER)
+    # -------------------------------
+    if is_json_request:
+        return jsonify({
+            "success": True,
+            "pagination": {
+                "page": transfers_paginated.page,
+                "per_page": transfers_paginated.per_page,
+                "total_pages": transfers_paginated.pages,
+                "total_records": transfers_paginated.total,
+                "has_next": transfers_paginated.has_next,
+                "has_prev": transfers_paginated.has_prev
+            },
+            "data": [
+                {
+                    "id": t.id,
+                    "transfer_number": t.transfer_number,
+                    "from_warehouse": t.from_warehouse,
+                    "to_warehouse": t.to_warehouse,
+                    "from_bin": t.from_bin,
+                    "to_bin": t.to_bin,
+                    "notes": t.notes,
+                    "status": t.status,
+                    "created_at": t.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                    "created_by": t.user_id
+                }
+                for t in transfers_paginated.items
+            ]
+        }), 200
+
+    # -------------------------------
+    # HTML RESPONSE (UNCHANGED)
+    # -------------------------------
+    return render_template(
+        'direct_inventory_transfer/index.html',
+        transfers=transfers_paginated.items,
+        pagination=transfers_paginated,
+        per_page=per_page,
+        search_term=search_term,
+        from_date=from_date,
+        to_date=to_date,
+        status_filter=status_filter,
+        current_user=current_user
+    )
+
+
+# @direct_inventory_transfer_bp.route('/', methods=['GET'])
+# @login_required
+# def index():
+#     """Direct Inventory Transfer main page with filtering, search, and pagination"""
+#     if not current_user.has_permission('direct_inventory_transfer'):
+#         flash('Access denied - Direct Inventory Transfer permissions required', 'error')
+#         return redirect(url_for('dashboard'))
+#
+#     page = request.args.get('page', 1, type=int)
+#     per_page = request.args.get('per_page', 10, type=int)
+#     search_term = request.args.get('search', '').strip()
+#     from_date = request.args.get('from_date', '').strip()
+#     to_date = request.args.get('to_date', '').strip()
+#     status_filter = request.args.get('status', '').strip()
+#
+#     if per_page not in [5, 10, 25, 50, 100]:
+#         per_page = 10
+#
+#     query = DirectInventoryTransfer.query
+#
+#     if current_user.role not in ['admin', 'manager']:
+#         query = query.filter_by(user_id=current_user.id)
+#
+#     if search_term:
+#         search_pattern = f'%{search_term}%'
+#         query = query.filter(
+#             db.or_(
+#                 DirectInventoryTransfer.transfer_number.ilike(search_pattern),
+#                 DirectInventoryTransfer.from_warehouse.ilike(search_pattern),
+#                 DirectInventoryTransfer.to_warehouse.ilike(search_pattern),
+#                 DirectInventoryTransfer.notes.ilike(search_pattern)
+#             )
+#         )
+#
+#     if status_filter:
+#         query = query.filter(DirectInventoryTransfer.status == status_filter)
+#
+#     if from_date:
+#         query = query.filter(DirectInventoryTransfer.created_at >= from_date)
+#
+#     if to_date:
+#         query = query.filter(DirectInventoryTransfer.created_at <= f"{to_date} 23:59:59")
+#
+#     query = query.order_by(DirectInventoryTransfer.created_at.desc())
+#     transfers_paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+#
+#     return render_template('direct_inventory_transfer/index.html',
+#                            transfers=transfers_paginated.items,
+#                            pagination=transfers_paginated,
+#                            per_page=per_page,
+#                            search_term=search_term,
+#                            from_date=from_date,
+#                            to_date=to_date,
+#                            status_filter=status_filter,
+#                            current_user=current_user)
 
 @direct_inventory_transfer_bp.route('/create', methods=['GET', 'POST'])
 @login_required
 def create():
-    """Create new Direct Inventory Transfer with first item included"""
+    """Create new Direct Inventory Transfer - Step 1: Choose warehouses and bins"""
     if not current_user.has_permission('direct_inventory_transfer'):
         flash('Access denied - Direct Inventory Transfer permissions required', 'error')
         return redirect(url_for('dashboard'))
@@ -90,31 +191,22 @@ def create():
             # JSON OR FORM DETECTION
             # -------------------------------
             is_json_request = request.is_json or 'application/json' in request.headers.get('Content-Type', '')
-            print("is_json_request---->",is_json_request)
             data = request.get_json() if is_json_request else request.form
-            print("data--->",data)
-            transfer_number = generate_direct_transfer_number()
-            print("transfer_number--->", transfer_number)
 
             # -------------------------------
-            # READ INPUT (FORM + JSON)
+            # STEP 1: CREATE DOCUMENT WITH WAREHOUSES
             # -------------------------------
-            item_code = (data.get('item_code') or '').strip()
-            item_type = data.get('item_type', 'none')
-            quantity = float(data.get('quantity', 1))
             from_warehouse = data.get('from_warehouse')
             to_warehouse = data.get('to_warehouse')
             from_bin = data.get('from_bin', '')
             to_bin = data.get('to_bin', '')
             notes = data.get('notes', '')
-            serial_numbers_str = (data.get('serial_numbers') or '').strip()
-            batch_number = (data.get('batch_number') or '').strip()
 
             # -------------------------------
             # BASIC VALIDATIONS
             # -------------------------------
-            if not all([item_code, from_warehouse, to_warehouse]):
-                msg = 'Item Code, From Warehouse and To Warehouse are required'
+            if not all([from_warehouse, to_warehouse]):
+                msg = 'From Warehouse and To Warehouse are required'
                 if is_json_request:
                     return jsonify({'success': False, 'error': msg}), 400
                 flash(msg, 'error')
@@ -128,64 +220,10 @@ def create():
                 return render_template('direct_inventory_transfer/create.html')
 
             # -------------------------------
-            # SAP LOGIN
+            # CREATE TRANSFER DOCUMENT
             # -------------------------------
-            sap = SAPIntegration()
-            if not sap.ensure_logged_in():
-                msg = 'SAP B1 authentication failed'
-                if is_json_request:
-                    return jsonify({'success': False, 'error': msg}), 500
-                flash(msg, 'error')
-                return render_template('direct_inventory_transfer/create.html')
-
-            # -------------------------------
-            # ITEM VALIDATION
-            # -------------------------------
-            validation_result = sap.validate_item_for_direct_transfer(item_code)
-            if not validation_result.get('valid'):
-                msg = f'Item validation failed: {validation_result.get("error", "Unknown error")}'
-                if is_json_request:
-                    return jsonify({'success': False, 'error': msg}), 400
-                flash(msg, 'error')
-                return render_template('direct_inventory_transfer/create.html')
-
-            item_type_validated = validation_result.get('item_type', 'none')
-            is_serial_managed = validation_result.get('is_serial_managed', False)
-            is_batch_managed = validation_result.get('is_batch_managed', False)
-
-            # -------------------------------
-            # SERIAL / BATCH VALIDATION
-            # -------------------------------
-            serial_numbers_list = []
-
-            if is_serial_managed:
-                if not serial_numbers_str:
-                    msg = 'Serial numbers are required for serial-managed items'
-                    if is_json_request:
-                        return jsonify({'success': False, 'error': msg}), 400
-                    flash(msg, 'error')
-                    return render_template('direct_inventory_transfer/create.html')
-
-                serial_numbers_list = [sn.strip() for sn in serial_numbers_str.split(',') if sn.strip()]
-
-                if len(serial_numbers_list) != int(quantity):
-                    msg = f'Number of serial numbers ({len(serial_numbers_list)}) must match quantity ({int(quantity)})'
-                    if is_json_request:
-                        return jsonify({'success': False, 'error': msg}), 400
-                    flash(msg, 'error')
-                    return render_template('direct_inventory_transfer/create.html')
-
-            elif is_batch_managed:
-                if not batch_number:
-                    msg = 'Batch number is required for batch-managed items'
-                    if is_json_request:
-                        return jsonify({'success': False, 'error': msg}), 400
-                    flash(msg, 'error')
-                    return render_template('direct_inventory_transfer/create.html')
-
-            # -------------------------------
-            # CREATE TRANSFER HEADER
-            # -------------------------------
+            transfer_number = generate_direct_transfer_number()
+            
             transfer = DirectInventoryTransfer(
                 transfer_number=transfer_number,
                 user_id=current_user.id,
@@ -198,52 +236,6 @@ def create():
             )
 
             db.session.add(transfer)
-            db.session.flush()  # get transfer.id
-
-            # -------------------------------
-            # CREATE TRANSFER ITEMS
-            # -------------------------------
-            if is_serial_managed:
-                for serial in serial_numbers_list:
-                    transfer_item = DirectInventoryTransferItem(
-                        direct_inventory_transfer_id=transfer.id,
-                        item_code=validation_result.get('item_code'),
-                        item_description=validation_result.get('item_description'),
-                        barcode=item_code,
-                        item_type=item_type_validated,
-                        quantity=1.0,
-                        from_warehouse_code=from_warehouse,
-                        to_warehouse_code=to_warehouse,
-                        from_bin_code=from_bin,
-                        to_bin_code=to_bin,
-                        batch_number=None,
-                        serial_numbers=json.dumps([serial]),
-                        validation_status='validated',
-                        qc_status='pending'
-                    )
-                    db.session.add(transfer_item)
-            else:
-                transfer_item = DirectInventoryTransferItem(
-                    direct_inventory_transfer_id=transfer.id,
-                    item_code=validation_result.get('item_code'),
-                    item_description=validation_result.get('item_description'),
-                    barcode=item_code,
-                    item_type=item_type_validated,
-                    quantity=quantity,
-                    from_warehouse_code=from_warehouse,
-                    to_warehouse_code=to_warehouse,
-                    from_bin_code=from_bin,
-                    to_bin_code=to_bin,
-                    batch_number=batch_number if is_batch_managed else None,
-                    serial_numbers=None,
-                    validation_status='validated',
-                    qc_status='pending'
-                )
-                db.session.add(transfer_item)
-
-            # -------------------------------
-            # COMMIT
-            # -------------------------------
             db.session.commit()
 
             # -------------------------------
@@ -253,17 +245,18 @@ def create():
                 return jsonify({
                     'success': True,
                     'transfer_id': transfer.id,
-                    'transfer_number': transfer_number
+                    'transfer_number': transfer_number,
+                    'message': 'Transfer document created successfully. Now add serial numbers.'
                 }), 201
 
-            flash(f'Direct Inventory Transfer {transfer_number} created successfully with item {item_code}', 'success')
+            flash(f'Direct Inventory Transfer {transfer_number} created successfully. Now add serial numbers.', 'success')
             return redirect(url_for('direct_inventory_transfer.detail', transfer_id=transfer.id))
 
         except Exception as e:
             db.session.rollback()
             logging.error(f"Error creating direct inventory transfer: {str(e)}")
 
-            if request.is_json:
+            if is_json_request:
                 return jsonify({'success': False, 'error': str(e)}), 500
 
             flash(f'Error creating transfer: {str(e)}', 'error')
@@ -561,6 +554,153 @@ def validate_item():
 
     except Exception as e:
         logging.error(f"Error validating item: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@direct_inventory_transfer_bp.route('/<int:transfer_id>/add_serial', methods=['POST'])
+@login_required
+def add_serial(transfer_id):
+    """Add serial number to Direct Inventory Transfer - Step 2: Add serial numbers one by one"""
+    try:
+        transfer = DirectInventoryTransfer.query.get_or_404(transfer_id)
+        
+        if transfer.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+
+        if transfer.status != 'draft':
+            return jsonify({'success': False, 'error': 'Cannot add serials to non-draft transfer'}), 400
+
+        # -------------------------------
+        # JSON OR FORM DETECTION
+        # -------------------------------
+        is_json_request = request.is_json or 'application/json' in request.headers.get('Content-Type', '')
+        data = request.get_json() if is_json_request else request.form
+        print("data/data-->",data)
+        serial_number = (data.get('serial_number') or '').strip()
+
+        if not serial_number:
+            return jsonify({'success': False, 'error': 'Serial number is required'}), 400
+
+        # -------------------------------
+        # SAP VALIDATION
+        # -------------------------------
+        sap = SAPIntegration()
+        if not sap.ensure_logged_in():
+            return jsonify({'success': False, 'error': 'SAP B1 authentication failed'}), 500
+
+        # Get serial number location and item details
+        serial_location = sap.get_serial_current_location(serial_number)
+        
+        if not serial_location.get('success'):
+            return jsonify({
+                'success': False,
+                'error': serial_location.get('error', 'Serial number not found or invalid')
+            }), 400
+
+        serial_data = serial_location.get('data', {})
+        item_code = serial_data.get('ItemCode')
+        
+        if not item_code:
+            return jsonify({'success': False, 'error': 'Could not determine item code for serial number'}), 400
+
+        # Validate that serial is in the FROM warehouse
+        current_warehouse = serial_data.get('WhsCode')
+        if current_warehouse != transfer.from_warehouse:
+            return jsonify({
+                'success': False, 
+                'error': f'Serial {serial_number} is in warehouse {current_warehouse}, but transfer is from {transfer.from_warehouse}'
+            }), 400
+
+        # Check if serial already exists in this transfer
+        existing_item = DirectInventoryTransferItem.query.filter_by(
+            direct_inventory_transfer_id=transfer.id,
+            item_code=item_code
+        ).first()
+
+        if existing_item:
+            # Check if serial already exists
+            existing_serials = json.loads(existing_item.serial_numbers) if existing_item.serial_numbers else []
+            if serial_number in existing_serials:
+                return jsonify({'success': False, 'error': f'Serial {serial_number} already added to this transfer'}), 400
+            
+            # Add serial to existing item
+            existing_serials.append(serial_number)
+            existing_item.serial_numbers = json.dumps(existing_serials)
+            existing_item.quantity = len(existing_serials)
+            existing_item.updated_at = datetime.utcnow()
+        else:
+            # Create new item line
+            transfer_item = DirectInventoryTransferItem(
+                direct_inventory_transfer_id=transfer.id,
+                item_code=item_code,
+                item_description=serial_data.get('itemName', ''),
+                barcode=item_code,
+                item_type='serial',
+                quantity=1,
+                from_warehouse_code=transfer.from_warehouse,
+                to_warehouse_code=transfer.to_warehouse,
+                from_bin_code=transfer.from_bin,
+                to_bin_code=transfer.to_bin,
+                serial_numbers=json.dumps([serial_number]),
+                validation_status='validated',
+                qc_status='pending'
+            )
+            db.session.add(transfer_item)
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'Serial {serial_number} added successfully',
+            'item_code': item_code,
+            'item_description': serial_data.get('itemName', ''),
+            'current_location': f"{current_warehouse} - {serial_data.get('BinCode', 'No Bin')}"
+        })
+
+    except Exception as e:
+        logging.error(f"Error adding serial: {str(e)}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@direct_inventory_transfer_bp.route('/<int:transfer_id>/submit_for_qc', methods=['POST'])
+@login_required
+def submit_for_qc_approval(transfer_id):
+    """Submit Direct Inventory Transfer for QC approval - Step 2 final action"""
+    try:
+        transfer = DirectInventoryTransfer.query.get_or_404(transfer_id)
+
+        if transfer.user_id != current_user.id and current_user.role not in ['admin', 'manager']:
+            return jsonify({'success': False, 'error': 'Access denied'}), 403
+
+        if transfer.status != 'draft':
+            return jsonify({'success': False, 'error': 'Only draft transfers can be submitted for QC'}), 400
+
+        if not transfer.items:
+            return jsonify({'success': False, 'error': 'Cannot submit transfer without serial numbers'}), 400
+
+        # Update status to submitted for QC approval
+        transfer.status = 'submitted'
+        transfer.submitted_at = datetime.utcnow()
+        transfer.updated_at = datetime.utcnow()
+
+        # Update all items to pending QC status
+        for item in transfer.items:
+            item.qc_status = 'pending'
+
+        db.session.commit()
+
+        logging.info(f"📤 Direct Inventory Transfer {transfer_id} submitted for QC approval")
+        return jsonify({
+            'success': True, 
+            'message': f'Transfer {transfer.transfer_number} submitted for QC approval',
+            'transfer_number': transfer.transfer_number,
+            'items_count': len(transfer.items)
+        })
+
+    except Exception as e:
+        logging.error(f"Error submitting transfer for QC: {str(e)}")
+        db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
