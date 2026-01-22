@@ -48,6 +48,77 @@ class UserSession(db.Model):
     branch_id = db.Column(db.String(10), nullable=True)
     login_time = db.Column(db.DateTime, default=datetime.utcnow)
     logout_time = db.Column(db.DateTime, nullable=True)
+
+class ModuleConfiguration(db.Model):
+    """Module-specific configuration settings"""
+    __tablename__ = 'module_configurations'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    module_name = db.Column(db.String(50), nullable=False)  # 'global', 'multi_grn', 'inventory_transfer', etc.
+    config_key = db.Column(db.String(100), nullable=False)  # 'label_size', 'labels_per_row', etc.
+    config_value = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.String(255), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (db.UniqueConstraint('module_name', 'config_key'),)
+    
+    @staticmethod
+    def get_config(module_name, config_key, default_value=None):
+        """Get configuration value for a module, with global fallback"""
+        # First try module-specific config
+        config = ModuleConfiguration.query.filter_by(
+            module_name=module_name, 
+            config_key=config_key
+        ).first()
+        
+        if config:
+            return config.config_value
+            
+        # Fallback to global config
+        global_config = ModuleConfiguration.query.filter_by(
+            module_name='global', 
+            config_key=config_key
+        ).first()
+        
+        if global_config:
+            return global_config.config_value
+            
+        return default_value
+    
+    @staticmethod
+    def get_global_config(config_key, default_value=None):
+        """Get global configuration value"""
+        config = ModuleConfiguration.query.filter_by(
+            module_name='global', 
+            config_key=config_key
+        ).first()
+        return config.config_value if config else default_value
+    
+    @staticmethod
+    def set_config(module_name, config_key, config_value, description=None):
+        """Set configuration value for a module"""
+        config = ModuleConfiguration.query.filter_by(
+            module_name=module_name, 
+            config_key=config_key
+        ).first()
+        
+        if config:
+            config.config_value = config_value
+            config.updated_at = datetime.utcnow()
+            if description:
+                config.description = description
+        else:
+            config = ModuleConfiguration(
+                module_name=module_name,
+                config_key=config_key,
+                config_value=config_value,
+                description=description
+            )
+            db.session.add(config)
+        
+        db.session.commit()
+        return config
     ip_address = db.Column(db.String(45), nullable=True)
     user_agent = db.Column(db.Text, nullable=True)
     active = db.Column(db.Boolean, default=True)

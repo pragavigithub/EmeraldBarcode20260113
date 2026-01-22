@@ -1,0 +1,350 @@
+{% extends "base.html" %}
+
+{% block title %}Global Label Configuration{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i data-feather="settings"></i> Global Label Configuration</h2>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                    <i data-feather="arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+
+            <!-- Global Label Configuration -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i data-feather="globe"></i> Global Print Label Settings</h5>
+                    <small>These settings apply to all modules (Multi GRN, Inventory Transfer, etc.)</small>
+                </div>
+                <div class="card-body">
+                    <form id="globalConfigForm">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="labelSize" class="form-label">Label Size</label>
+                                    <select class="form-select" id="labelSize" name="label_size">
+                                        <option value="small">Small (Compact)</option>
+                                        <option value="medium">Medium (Standard)</option>
+                                        <option value="large">Large (Detailed)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="labelsPerRow" class="form-label">Labels Per Row</label>
+                                    <select class="form-select" id="labelsPerRow" name="labels_per_row">
+                                        <option value="2">2 Labels (50% width)</option>
+                                        <option value="3">3 Labels (33% width)</option>
+                                        <option value="4">4 Labels (25% width)</option>
+                                        <option value="6">6 Labels (16% width)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="qrCodeSize" class="form-label">QR Code Size</label>
+                                    <select class="form-select" id="qrCodeSize" name="qr_code_size">
+                                        <option value="80">Small (80px)</option>
+                                        <option value="120">Medium (120px)</option>
+                                        <option value="150">Large (150px)</option>
+                                        <option value="200">Extra Large (200px)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="mb-3">
+                                    <label for="printLayout" class="form-label">Print Layout</label>
+                                    <select class="form-select" id="printLayout" name="print_layout">
+                                        <option value="compact">Compact (Less spacing)</option>
+                                        <option value="standard">Standard (Normal spacing)</option>
+                                        <option value="detailed">Detailed (More info)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-success">
+                                    <i data-feather="save"></i> Save Global Configuration
+                                </button>
+                                <button type="button" class="btn btn-info" onclick="previewLabels()">
+                                    <i data-feather="eye"></i> Preview Labels
+                                </button>
+                                <button type="button" class="btn btn-warning" onclick="resetToDefaults()">
+                                    <i data-feather="refresh-cw"></i> Reset to Defaults
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Affected Modules -->
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0"><i data-feather="layers"></i> Modules Using These Settings</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card border-primary">
+                                <div class="card-body text-center">
+                                    <i data-feather="package" class="mb-2" style="width: 32px; height: 32px;"></i>
+                                    <h6>Multi GRN Module</h6>
+                                    <small class="text-muted">Batch label printing</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-success">
+                                <div class="card-body text-center">
+                                    <i data-feather="truck" class="mb-2" style="width: 32px; height: 32px;"></i>
+                                    <h6>Inventory Transfer</h6>
+                                    <small class="text-muted">Transfer QR labels</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-warning">
+                                <div class="card-body text-center">
+                                    <i data-feather="tag" class="mb-2" style="width: 32px; height: 32px;"></i>
+                                    <h6>Other Modules</h6>
+                                    <small class="text-muted">Future label printing</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configuration Help -->
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0"><i data-feather="help-circle"></i> Configuration Guide</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Label Size Options:</h6>
+                            <ul class="small">
+                                <li><strong>Small:</strong> Minimal information, best for small label sheets</li>
+                                <li><strong>Medium:</strong> Standard information, good for most use cases</li>
+                                <li><strong>Large:</strong> Detailed information, best for large label sheets</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Labels Per Row:</h6>
+                            <ul class="small">
+                                <li><strong>2 Labels:</strong> Large labels, good for detailed printing</li>
+                                <li><strong>3 Labels:</strong> Medium labels, balanced size</li>
+                                <li><strong>4 Labels:</strong> Standard labels, most common</li>
+                                <li><strong>6 Labels:</strong> Small labels, maximum efficiency</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="alert alert-info mt-3">
+                        <i data-feather="info"></i>
+                        <strong>Global Settings:</strong> These settings apply to all label printing across the entire system. 
+                        Individual modules will inherit these settings unless specifically overridden.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Global Label Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="previewContainer" class="row">
+                    <!-- Preview labels will be generated here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadCurrentConfig();
+    
+    // Form submission
+    document.getElementById('globalConfigForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveConfiguration();
+    });
+});
+
+function loadCurrentConfig() {
+    fetch('/api/global-config')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const config = data.config;
+                document.getElementById('labelSize').value = config.label_size || 'medium';
+                document.getElementById('labelsPerRow').value = config.labels_per_row || '4';
+                document.getElementById('qrCodeSize').value = config.qr_code_size || '120';
+                document.getElementById('printLayout').value = config.print_layout || 'compact';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading config:', error);
+            showAlert('Error loading configuration', 'danger');
+        });
+}
+
+function saveConfiguration() {
+    const formData = new FormData(document.getElementById('globalConfigForm'));
+    const config = {};
+    
+    for (let [key, value] of formData.entries()) {
+        config[key] = value;
+    }
+    
+    fetch('/api/global-config', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('Global configuration saved successfully! All modules will use these settings.', 'success');
+        } else {
+            showAlert('Error saving configuration: ' + data.error, 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving config:', error);
+        showAlert('Error saving configuration', 'danger');
+    });
+}
+
+function resetToDefaults() {
+    if (confirm('Reset all global settings to default values? This will affect all modules.')) {
+        document.getElementById('labelSize').value = 'medium';
+        document.getElementById('labelsPerRow').value = '4';
+        document.getElementById('qrCodeSize').value = '120';
+        document.getElementById('printLayout').value = 'compact';
+        saveConfiguration();
+    }
+}
+
+function previewLabels() {
+    const labelsPerRow = document.getElementById('labelsPerRow').value;
+    const qrCodeSize = document.getElementById('qrCodeSize').value;
+    const labelSize = document.getElementById('labelSize').value;
+    
+    const colClass = getBootstrapColClass(labelsPerRow);
+    const container = document.getElementById('previewContainer');
+    container.innerHTML = '';
+    
+    // Generate 3 sample labels for preview
+    for (let i = 1; i <= 3; i++) {
+        const labelDiv = document.createElement('div');
+        labelDiv.className = `${colClass} mb-3`;
+        
+        let labelContent = '';
+        if (labelSize === 'small') {
+            labelContent = `
+                <div class="text-center p-2 border rounded">
+                    <h6 class="mb-1 small"><strong>ITEM_${i}</strong></h6>
+                    <div style="width: ${qrCodeSize}px; height: ${qrCodeSize}px; background: #f0f0f0; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                        QR ${qrCodeSize}px
+                    </div>
+                    <p class="mb-0 small"><strong>DOC-${i}</strong></p>
+                    <div class="small">Pack: ${i} of 3</div>
+                </div>
+            `;
+        } else if (labelSize === 'large') {
+            labelContent = `
+                <div class="text-center p-4 border rounded">
+                    <h5 class="mb-2"><strong>ITEM_CODE_${i}</strong></h5>
+                    <p class="mb-2">Sample Item Name ${i}</p>
+                    <div style="width: ${qrCodeSize}px; height: ${qrCodeSize}px; background: #f0f0f0; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                        QR ${qrCodeSize}px
+                    </div>
+                    <h6 class="mb-2 mt-2"><strong>DOC-${i}</strong></h6>
+                    <div class="text-start small">
+                        <strong>PO:</strong> 25263067<br>
+                        <strong>Batch:</strong> BATCH_${i}<br>
+                        <strong>Qty:</strong> 334<br>
+                        <strong>Pack:</strong> ${i} of 3<br>
+                        <strong>Date:</strong> 2026-01-22<br>
+                        <strong>Exp:</strong> 2026-03-31
+                    </div>
+                </div>
+            `;
+        } else {
+            // Medium
+            labelContent = `
+                <div class="text-center p-3 border rounded">
+                    <h6 class="mb-2"><strong>ITEM_CODE_${i}</strong></h6>
+                    <p class="mb-1 small">Sample Item Name ${i}</p>
+                    <div style="width: ${qrCodeSize}px; height: ${qrCodeSize}px; background: #f0f0f0; border: 1px dashed #ccc; display: flex; align-items: center; justify-content: center; margin: 0 auto;">
+                        QR ${qrCodeSize}px
+                    </div>
+                    <p class="mb-1 small mt-2"><strong>DOC-${i}</strong></p>
+                    <div class="small text-start">
+                        <strong>PO:</strong> 25263067<br>
+                        <strong>Batch:</strong> BATCH_${i}<br>
+                        <strong>Pack:</strong> ${i} of 3<br>
+                        <strong>Date:</strong> 2026-01-22
+                    </div>
+                </div>
+            `;
+        }
+        
+        labelDiv.innerHTML = labelContent;
+        container.appendChild(labelDiv);
+    }
+    
+    const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+    modal.show();
+}
+
+function getBootstrapColClass(labelsPerRow) {
+    switch(labelsPerRow) {
+        case '2': return 'col-md-6';
+        case '3': return 'col-md-4';
+        case '4': return 'col-md-3';
+        case '6': return 'col-md-2';
+        default: return 'col-md-3';
+    }
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const container = document.querySelector('.container-fluid');
+    container.insertBefore(alertDiv, container.firstChild);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

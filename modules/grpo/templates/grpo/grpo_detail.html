@@ -2073,111 +2073,177 @@ function generateSerialQRLabels(itemId, itemCode, itemName) {
 
 // Generate QR labels for all batch numbers with multiple labels per batch based on quantity
 function generateBatchQRLabels(itemId, itemCode, itemName) {
-    fetch(`/grpo/items/${itemId}/batch-numbers`, {
-        credentials: 'same-origin'
-    })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (!data.success || !data.batch_numbers || data.batch_numbers.length === 0) {
-                alert('No batch numbers found for this item');
-                return;
-            }
+    // First, get the global configuration
+    fetch('/api/global-config')
+        .then(response => response.json())
+        .then(configData => {
+            const config = configData.success ? configData.config : {
+                label_size: 'medium',
+                labels_per_row: '4',
+                qr_code_size: '120',
+                print_layout: 'compact'
+            };
+            
+            // Now fetch batch numbers
+            return fetch(`/grpo/items/${itemId}/batch-numbers`, {
+                credentials: 'same-origin'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data.success || !data.batch_numbers || data.batch_numbers.length === 0) {
+                    alert('No batch numbers found for this item');
+                    return;
+                }
 
-            const batchNumbers = data.batch_numbers;
-            const grpoDetails = data.grpo_details;
-            const modal = new bootstrap.Modal(document.getElementById('serialQRLabelsModal'));
-            const container = document.getElementById('serialQRLabelsContainer');
-            container.innerHTML = '';
+                const batchNumbers = data.batch_numbers;
+                const grpoDetails = data.grpo_details;
+                const modal = new bootstrap.Modal(document.getElementById('serialQRLabelsModal'));
+                const container = document.getElementById('serialQRLabelsContainer');
+                container.innerHTML = '';
 
-            let totalLabelsGenerated = 0;
+                let totalLabelsGenerated = 0;
+                
+                // Get Bootstrap column class based on global configuration
+                const colClass = getBootstrapColClass(config.labels_per_row);
+                const qrSize = parseInt(config.qr_code_size);
 
-            // Wait for QRCode library then generate codes
-            waitForQRCode((loaded) => {
-                batchNumbers.forEach((batch, batchIndex) => {
-                    const receivedQty = Math.floor(batch.quantity);
-                    const numberOfPacks = batch.no_of_packs || 1;
-                    const qtyPerPack = batch.qty_per_pack || receivedQty;
+                // Wait for QRCode library then generate codes
+                waitForQRCode((loaded) => {
+                    batchNumbers.forEach((batch, batchIndex) => {
+                        const receivedQty = Math.floor(batch.quantity);
+                        const numberOfPacks = batch.no_of_packs || 1;
+                        const qtyPerPack = batch.qty_per_pack || receivedQty;
 
-                    // Generate one QR code per pack based on no_of_packs
-                    for (let packNum = 1; packNum <= numberOfPacks; packNum++) {
-                        totalLabelsGenerated++;
+                        // Generate one QR code per pack based on no_of_packs
+                        for (let packNum = 1; packNum <= numberOfPacks; packNum++) {
+                            totalLabelsGenerated++;
 
-                        // Use proper doc_number from GRPO document
-                        const docNumber = grpoDetails.doc_number || 'N/A';
+                            // Use proper doc_number from GRPO document
+                            const docNumber = grpoDetails.doc_number || 'N/A';
 
-                        // Comprehensive QR data with all required fields in JSON format
-                        const qrDataObj = {
-                            'id': docNumber,
-                            'po': grpoDetails.po_number,
-                            'item': itemCode,
-                            'batch': batch.batch_number,
-                            'qty': qtyPerPack,
-                            'pack': `${packNum} of ${numberOfPacks}`,
-                            'grn_date': grpoDetails.grn_date,
-                            'exp_date': batch.expiry_date || 'N/A'
-                        };
-                        
-                        // Convert to JSON format for QR code
-                        const qrData = JSON.stringify(qrDataObj);
+                            // Comprehensive QR data with all required fields in JSON format
+                            const qrDataObj = {
+                                'id': docNumber,
+                                'po': grpoDetails.po_number,
+                                'item': itemCode,
+                                'batch': batch.batch_number,
+                                'qty': qtyPerPack,
+                                'pack': `${packNum} of ${numberOfPacks}`,
+                                'grn_date': grpoDetails.grn_date,
+                                'exp_date': batch.expiry_date || 'N/A'
+                            };
+                            
+                            // Convert to JSON format for QR code
+                            const qrData = JSON.stringify(qrDataObj);
 
-                        const qrDiv = document.createElement('div');
-                        qrDiv.className = 'qr-label-item col-md-4 mb-3';
+                            const qrDiv = document.createElement('div');
+                            qrDiv.className = `qr-label-item ${colClass} mb-3`;
 
-                        qrDiv.innerHTML = `
-                            <div class="text-center p-3 border rounded">
-                                <h6 class="mb-2"><strong>${itemCode}</strong></h6>
-                                <p class="mb-1 small">${itemName}</p>
-                                <div class="qr-code-container mb-2"></div>
-                                <p class="mb-1 small"><strong>${docNumber}</strong></p>
-                                <div class="small text-start">
-                                    <strong>PO:</strong> ${grpoDetails.po_number}<br>
-                                    <strong>Batch:</strong> ${batch.batch_number}<br>
-                                    <strong>Qty per Pack:</strong> ${qtyPerPack}<br>
-                                    <strong>Pack:</strong> ${packNum} of ${numberOfPacks}<br>
-                                    <strong>GRN Date:</strong> ${grpoDetails.grn_date}<br>
-                                    <strong>Exp Date:</strong> ${batch.expiry_date || 'N/A'}
-                                </div>
-                            </div>
-                        `;
-                        container.appendChild(qrDiv);
-
-                        // Get QR container for code generation
-                        const qrContainer = qrDiv.querySelector('.qr-code-container');
-
-                        // Generate QR code using qrcodejs
-                        if (loaded && typeof QRCode !== 'undefined') {
-                            try {
-                                new QRCode(qrContainer, {
-                                    text: qrData,
-                                    width: 150,
-                                    height: 150,
-                                    colorDark: '#000000',
-                                    colorLight: '#ffffff',
-                                    correctLevel: QRCode.CorrectLevel.H
-                                });
-                            } catch (error) {
-                                console.error('QR generation error:', error);
-                                qrContainer.innerHTML = `<p class="text-danger">Error generating QR</p>`;
+                            // Adjust content based on global label size configuration
+                            let labelContent = '';
+                            if (config.label_size === 'small') {
+                                labelContent = `
+                                    <div class="text-center p-2 border rounded">
+                                        <h6 class="mb-1 small"><strong>${itemCode}</strong></h6>
+                                        <div class="qr-code-container mb-1"></div>
+                                        <p class="mb-0 small"><strong>${docNumber}</strong></p>
+                                        <div class="small">
+                                            <strong>Batch:</strong> ${batch.batch_number}<br>
+                                            <strong>Pack:</strong> ${packNum} of ${numberOfPacks}
+                                        </div>
+                                    </div>
+                                `;
+                            } else if (config.label_size === 'large') {
+                                labelContent = `
+                                    <div class="text-center p-4 border rounded">
+                                        <h5 class="mb-2"><strong>${itemCode}</strong></h5>
+                                        <p class="mb-2">${itemName}</p>
+                                        <div class="qr-code-container mb-3"></div>
+                                        <h6 class="mb-2"><strong>${docNumber}</strong></h6>
+                                        <div class="text-start">
+                                            <strong>PO:</strong> ${grpoDetails.po_number}<br>
+                                            <strong>Item Code:</strong> ${itemCode}<br>
+                                            <strong>Batch:</strong> ${batch.batch_number}<br>
+                                            <strong>Qty per Pack:</strong> ${qtyPerPack}<br>
+                                            <strong>Pack:</strong> ${packNum} of ${numberOfPacks}<br>
+                                            <strong>GRN Date:</strong> ${grpoDetails.grn_date}<br>
+                                            <strong>Exp Date:</strong> ${batch.expiry_date || 'N/A'}<br>
+                                            <strong>Bin:</strong> ${batch.bin_location || 'N/A'}
+                                        </div>
+                                    </div>
+                                `;
+                            } else {
+                                // Medium (default)
+                                labelContent = `
+                                    <div class="text-center p-3 border rounded">
+                                        <h6 class="mb-2"><strong>${itemCode}</strong></h6>
+                                        <p class="mb-1 small">${itemName}</p>
+                                        <div class="qr-code-container mb-2"></div>
+                                        <p class="mb-1 small"><strong>${docNumber}</strong></p>
+                                        <div class="small text-start">
+                                            <strong>PO:</strong> ${grpoDetails.po_number}<br>
+                                            <strong>Batch:</strong> ${batch.batch_number}<br>
+                                            <strong>Qty per Pack:</strong> ${qtyPerPack}<br>
+                                            <strong>Pack:</strong> ${packNum} of ${numberOfPacks}<br>
+                                            <strong>GRN Date:</strong> ${grpoDetails.grn_date}<br>
+                                            <strong>Exp Date:</strong> ${batch.expiry_date || 'N/A'}
+                                        </div>
+                                    </div>
+                                `;
                             }
-                        } else {
-                            qrContainer.innerHTML = `<p class="text-danger">QR library not loaded</p>`;
-                        }
-                    }
-                });
+                            
+                            qrDiv.innerHTML = labelContent;
+                            container.appendChild(qrDiv);
 
-                console.log(`Generated ${totalLabelsGenerated} QR code labels`);
-                modal.show();
+                            // Get QR container for code generation
+                            const qrContainer = qrDiv.querySelector('.qr-code-container');
+
+                            // Generate QR code using qrcodejs with globally configured size
+                            if (loaded && typeof QRCode !== 'undefined') {
+                                try {
+                                    new QRCode(qrContainer, {
+                                        text: qrData,
+                                        width: qrSize,
+                                        height: qrSize,
+                                        colorDark: '#000000',
+                                        colorLight: '#ffffff',
+                                        correctLevel: QRCode.CorrectLevel.H
+                                    });
+                                } catch (error) {
+                                    console.error('QR generation error:', error);
+                                    qrContainer.innerHTML = `<p class="text-danger">Error generating QR</p>`;
+                                }
+                            } else {
+                                qrContainer.innerHTML = `<p class="text-danger">QR library not loaded</p>`;
+                            }
+                        }
+                    });
+
+                    console.log(`Generated ${totalLabelsGenerated} QR code labels using global configuration`);
+                    modal.show();
+                });
             });
         })
         .catch(error => {
-            console.error('Error fetching batch numbers:', error);
+            console.error('Error loading global configuration or batch numbers:', error);
             alert(`Error loading batch numbers: ${error.message}\n\nPlease check:\n1. Item has batch numbers saved\n2. You are logged in\n3. Check browser console for details`);
         });
+}
+
+// Helper function to get Bootstrap column class based on labels per row
+function getBootstrapColClass(labelsPerRow) {
+    switch(labelsPerRow) {
+        case '2': return 'col-md-6';
+        case '3': return 'col-md-4';
+        case '4': return 'col-md-3';
+        case '6': return 'col-md-2';
+        default: return 'col-md-3';
+    }
 }
 
 // Generate QR labels for non-managed items

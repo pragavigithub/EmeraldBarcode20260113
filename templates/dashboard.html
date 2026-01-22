@@ -127,30 +127,37 @@
 <!--                        </button>-->
 <!--                    </div>-->
 <!--                    {% endif %}-->
-<!--                </div>-->
-<!--                -->
-<!--                {% if current_user.has_permission('user_management') or current_user.role in ['admin', 'manager'] %}-->
-<!--                <hr>-->
-<!--                <div class="row">-->
-<!--                    <div class="col-md-4 mb-3">-->
-<!--                        <form action="{{ url_for('sync_sap_data') }}" method="POST" style="display: inline;">-->
-<!--                            <button type="submit" class="btn btn-outline-primary w-100" onclick="return confirm('This will sync warehouses, bins, and business partners from SAP B1. Continue?')">-->
-<!--                                <i data-feather="refresh-cw"></i> Sync SAP Data-->
-<!--                            </button>-->
-<!--                        </form>-->
-<!--                    </div>-->
-<!--                    <div class="col-md-4 mb-3">-->
-<!--                        <a href="{{ url_for('user_management') }}" class="btn btn-outline-secondary w-100">-->
-<!--                            <i data-feather="users"></i> Manage Users-->
-<!--                        </a>-->
-<!--                    </div>-->
-<!--                    <div class="col-md-4 mb-3">-->
-<!--                        <a href="{{ url_for('branch_management') }}" class="btn btn-outline-info w-100">-->
-<!--                            <i data-feather="map-pin"></i> Manage Branches-->
-<!--                        </a>-->
-<!--                    </div>-->
-<!--                </div>-->
-<!--                {% endif %}-->
+                </div>
+                
+                {% if current_user.has_permission('user_management') or current_user.role in ['admin', 'manager'] %}
+                <hr>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <form action="{{ url_for('sync_sap_data') }}" method="POST" style="display: inline;">
+                            <button type="submit" class="btn btn-outline-primary w-100" onclick="return confirm('This will sync warehouses, bins, and business partners from SAP B1. Continue?')">
+                                <i data-feather="refresh-cw"></i> Sync SAP Data
+                            </button>
+                        </form>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('user_management') }}" class="btn btn-outline-secondary w-100">
+                            <i data-feather="users"></i> Manage Users
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('branch_management') }}" class="btn btn-outline-info w-100">
+                            <i data-feather="map-pin"></i> Manage Branches
+                        </a>
+                    </div>
+                    {% if current_user.role == 'admin' %}
+                    <div class="col-md-3 mb-3">
+                        <a href="{{ url_for('module_config_admin') }}" class="btn btn-outline-warning w-100">
+                            <i data-feather="settings"></i> Label Config
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}-->
 <!--            </div>-->
 <!--        </div>-->
 <!--    </div>-->

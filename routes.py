@@ -11,6 +11,7 @@ from models import User, InventoryTransfer, InventoryTransferItem, PickList, Pic
     InventoryCount, InventoryCountItem, SAPInventoryCount, SAPInventoryCountLine, BarcodeLabel, BinScanningLog, \
     DocumentNumberSeries, QRCodeLabel, PickListLine, \
     DirectInventoryTransfer, DirectInventoryTransferItem, TransferScanState, InventoryTransferRequestLine
+from models_extensions import Branch, UserSession, ModuleConfiguration
 from modules.grpo.models import GRPODocument, GRPOItem, GRPOSerialNumber, GRPOBatchNumber, PurchaseDeliveryNote
 from modules.multi_grn_creation.models import MultiGRNBatch
 from sap_integration import SAPIntegration
@@ -5901,3 +5902,147 @@ def preview_grpo_json(grpo_id):
         import traceback
         logging.error(f"🔍 Full traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': str(e)})
+
+# ============================================================================
+# MODULE CONFIGURATION ROUTES
+# ============================================================================
+
+@app.route('/api/module-config/<module_name>', methods=['GET'])
+@login_required
+def get_module_config(module_name):
+    """Get all configuration settings for a module"""
+    try:
+        if module_name == 'global':
+            # Get global configurations
+            configs = ModuleConfiguration.query.filter_by(module_name='global').all()
+        else:
+            # Get module-specific configs with global fallback
+            configs = ModuleConfiguration.query.filter_by(module_name=module_name).all()
+            global_configs = ModuleConfiguration.query.filter_by(module_name='global').all()
+            
+            # Create a dict with global configs as base
+            config_dict = {config.config_key: config.config_value for config in global_configs}
+            # Override with module-specific configs
+            for config in configs:
+                config_dict[config.config_key] = config.config_value
+            
+            return jsonify({
+                'success': True,
+                'config': config_dict
+            })
+        
+        config_dict = {config.config_key: config.config_value for config in configs}
+        
+        # Set default values if not configured
+        defaults = {
+            'label_size': 'medium',
+            'labels_per_row': '4',
+            'qr_code_size': '120',
+            'print_layout': 'compact'
+        }
+        
+        for key, default_value in defaults.items():
+            if key not in config_dict:
+                config_dict[key] = default_value
+        
+        return jsonify({
+            'success': True,
+            'config': config_dict
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting module config: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/global-config', methods=['GET'])
+@login_required
+def get_global_config():
+    """Get global configuration settings"""
+    try:
+        configs = ModuleConfiguration.query.filter_by(module_name='global').all()
+        config_dict = {config.config_key: config.config_value for config in configs}
+        
+        # Set default values if not configured
+        defaults = {
+            'label_size': 'medium',
+            'labels_per_row': '4',
+            'qr_code_size': '120',
+            'print_layout': 'compact'
+        }
+        
+        for key, default_value in defaults.items():
+            if key not in config_dict:
+                config_dict[key] = default_value
+        
+        return jsonify({
+            'success': True,
+            'config': config_dict
+        })
+        
+    except Exception as e:
+        logging.error(f"Error getting global config: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/global-config', methods=['POST'])
+@login_required
+def set_global_config():
+    """Set global configuration settings"""
+    try:
+        # Check if user has admin permissions
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'error': 'Admin access required'})
+        
+        data = request.get_json()
+        
+        for config_key, config_value in data.items():
+            ModuleConfiguration.set_config(
+                module_name='global',
+                config_key=config_key,
+                config_value=str(config_value)
+            )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Global configuration updated successfully'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error setting global config: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/module-config/<module_name>', methods=['POST'])
+@login_required
+def set_module_config(module_name):
+    """Set configuration settings for a module"""
+    try:
+        # Check if user has admin permissions
+        if current_user.role != 'admin':
+            return jsonify({'success': False, 'error': 'Admin access required'})
+        
+        data = request.get_json()
+        
+        for config_key, config_value in data.items():
+            ModuleConfiguration.set_config(
+                module_name=module_name,
+                config_key=config_key,
+                config_value=str(config_value)
+            )
+        
+        return jsonify({
+            'success': True,
+            'message': f'Configuration updated for {module_name}'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error setting module config: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/admin/module-config')
+@login_required
+def module_config_admin():
+    """Admin interface for module configuration"""
+    if current_user.role != 'admin':
+        flash('Admin access required', 'error')
+        return redirect(url_for('dashboard'))
+    
+    return render_template('admin/module_config.html')
