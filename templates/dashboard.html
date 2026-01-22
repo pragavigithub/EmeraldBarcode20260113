@@ -23,7 +23,7 @@
         </div>
     </div>
     {% endif %} -->
-    
+
    {% if current_user.has_permission('multiple_grn') %}
    <div class="col-md-3 col-sm-6 mb-3">
        <div class="card dashboard-card" data-url="{{ url_for('multi_grn.index') }}">
@@ -35,7 +35,7 @@
        </div>
    </div>
    {% endif %}
-    
+
     {% if current_user.has_permission('inventory_transfer') %}
     <div class="col-md-3 col-sm-6 mb-3">
         <div class="card dashboard-card" data-url="{{ url_for('inventory_transfer') }}">
@@ -47,7 +47,7 @@
         </div>
     </div>
     {% endif %}
-    
+
     {% if current_user.has_permission('direct_inventory_transfer') %}
     <div class="col-md-3 col-sm-6 mb-3">
         <div class="card dashboard-card" data-url="{{ url_for('direct_inventory_transfer.index') }}">
@@ -59,7 +59,7 @@
         </div>
     </div>
     {% endif %}
-    
+
 <!--    {% if current_user.has_permission('pick_list') %}-->
 <!--    <div class="col-md-3 col-sm-6 mb-3">-->
 <!--        <div class="card dashboard-card" data-url="{{ url_for('pick_list') }}">-->
@@ -71,7 +71,7 @@
 <!--        </div>-->
 <!--    </div>-->
 <!--    {% endif %}-->
-    
+
 <!--    {% if current_user.has_permission('inventory_counting') %}-->
 <!--    <div class="col-md-3 col-sm-6 mb-3">-->
 <!--        <div class="card dashboard-card" data-url="{{ url_for('inventory_counting') }}">-->
@@ -83,7 +83,7 @@
 <!--        </div>-->
 <!--    </div>-->
 <!--    {% endif %}-->
-    
+
     {% if current_user.has_permission('inventory_counting') %}
     <div class="col-md-3 col-sm-6 mb-3">
         <div class="card dashboard-card" data-url="{{ url_for('inventory_counting_history') }}">
@@ -98,13 +98,13 @@
 </div>
 
 <!-- Quick Actions -->
-<!--<div class="row mb-4">-->
-<!--    <div class="col-12">-->
-<!--        <div class="card">-->
-<!--            <div class="card-header">-->
-<!--                <h5 class="mb-0">Quick Actions</h5>-->
-<!--            </div>-->
-<!--            <div class="card-body">-->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
 <!--                <div class="row">-->
 <!--                    {% if current_user.has_permission('bin_scanning') %}-->
 <!--                    <div class="col-md-4 mb-3">-->
@@ -128,7 +128,7 @@
 <!--                    </div>-->
 <!--                    {% endif %}-->
                 </div>
-                
+
                 {% if current_user.has_permission('user_management') or current_user.role in ['admin', 'manager'] %}
                 <hr>
                 <div class="row">
@@ -157,14 +157,15 @@
                     </div>
                     {% endif %}
                 </div>
-                {% endif %}-->
-<!--            </div>-->
-<!--        </div>-->
-<!--    </div>-->
-<!--</div>-->
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+
 
 <!-- Recent Activity -->
-<div class="row">
+<div class="row mb-4">
     <div class="col-12">
         <div class="card">
             <div class="card-header">
@@ -211,42 +212,42 @@
 </div>
 
 <!-- Quick Scan Modal -->
-<div class="modal fade" id="quickScanModal" tabindex="-1" aria-labelledby="quickScanModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="quickScanModalLabel">Quick Scan</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="scanner-container">
-                    <video id="quickScanVideo" class="scanner-video" autoplay></video>
-                    <div class="scanner-overlay"></div>
-                </div>
-                <div class="mt-3">
-                    <input type="text" class="form-control" id="quickScanInput" placeholder="Or enter barcode manually">
-                </div>
-                <div class="mt-3" id="quickScanResult" style="display: none;">
-                    <div class="alert alert-info">
-                        <strong>Scanned:</strong> <span id="scannedCode"></span>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="processQuickScan()">Process</button>
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
+<!--<div class="modal fade" id="quickScanModal" tabindex="-1" aria-labelledby="quickScanModalLabel" aria-hidden="true">-->
+<!--    <div class="modal-dialog">-->
+<!--        <div class="modal-content">-->
+<!--            <div class="modal-header">-->
+<!--                <h5 class="modal-title" id="quickScanModalLabel">Quick Scan</h5>-->
+<!--                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>-->
+<!--            </div>-->
+<!--            <div class="modal-body">-->
+<!--                <div class="scanner-container">-->
+<!--                    <video id="quickScanVideo" class="scanner-video" autoplay></video>-->
+<!--                    <div class="scanner-overlay"></div>-->
+<!--                </div>-->
+<!--                <div class="mt-3">-->
+<!--                    <input type="text" class="form-control" id="quickScanInput" placeholder="Or enter barcode manually">-->
+<!--                </div>-->
+<!--                <div class="mt-3" id="quickScanResult" style="display: none;">-->
+<!--                    <div class="alert alert-info">-->
+<!--                        <strong>Scanned:</strong> <span id="scannedCode"></span>-->
+<!--                    </div>-->
+<!--                </div>-->
+<!--            </div>-->
+<!--            <div class="modal-footer">-->
+<!--                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>-->
+<!--                <button type="button" class="btn btn-primary" onclick="processQuickScan()">Process</button>-->
+<!--            </div>-->
+<!--        </div>-->
+<!--    </div>-->
+<!--</div>-->
+<!--{% endblock %}-->
 
 {% block scripts %}
 <script>
 function startQuickScan() {
     const modal = new bootstrap.Modal(document.getElementById('quickScanModal'));
     modal.show();
-    
+
     modal._element.addEventListener('shown.bs.modal', function () {
         const video = document.getElementById('quickScanVideo');
         startBarcodeScanner('quickScanVideo', function(code) {
@@ -255,7 +256,7 @@ function startQuickScan() {
             document.getElementById('quickScanInput').value = code;
         });
     });
-    
+
     modal._element.addEventListener('hidden.bs.modal', function () {
         stopBarcodeScanner();
     });
