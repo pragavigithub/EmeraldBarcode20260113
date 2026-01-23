@@ -538,82 +538,89 @@ def supplierBarCode():
         "success": True,
         "decoded": decoded
     })
-
-
 @multi_grn_bp.route('/create/step3/<int:batch_id>', methods=['GET', 'POST'])
 @login_required
 def create_step3_select_lines(batch_id):
     """Step 3: Select line items from POs and manage item details"""
+
     batch = MultiGRNBatch.query.get_or_404(batch_id)
-    
+
     if batch.user_id != current_user.id:
         flash('Access denied', 'error')
         return redirect(url_for('multi_grn.index'))
-    
+
+    def wants_json():
+        return (
+            request.is_json or
+            request.headers.get('Content-Type') == 'application/json' or
+            request.headers.get('Accept') == 'application/json'
+        )
+
+    # =========================
+    # POST: Save selected lines
+    # =========================
     if request.method == 'POST':
-        # Process line selection from Step 2 (initial selection)
         sap_service = SAPMultiGRNService()
-        
+
         for po_link in batch.po_links:
             selected_lines = request.form.getlist(f'lines_po_{po_link.id}[]')
-            
+
             for line_data_json in selected_lines:
                 line_data = json.loads(line_data_json)
                 qty_key = f'qty_po_{po_link.id}_line_{line_data["LineNum"]}'
-                
-                # Sanitize open_qty from SAP - ensure it's a valid number
+
+                # Sanitize open quantity
                 raw_open_qty = line_data.get('OpenQuantity')
                 try:
                     open_qty = Decimal(str(raw_open_qty)) if raw_open_qty not in (None, '', 'None') else Decimal('0')
                 except (ValueError, InvalidOperation):
                     open_qty = Decimal('0')
-                
-                # Handle empty receive quantity field - use open quantity as default
+
+                # Receive quantity
                 receive_qty_str = request.form.get(qty_key, '').strip()
-                if receive_qty_str == '' or receive_qty_str is None:
+                if not receive_qty_str:
                     selected_qty = open_qty
                 else:
                     try:
                         selected_qty = Decimal(receive_qty_str)
                     except (ValueError, InvalidOperation):
-                        # If invalid input, default to open quantity
-                        logging.warning(f"Invalid receive quantity '{receive_qty_str}' for item {line_data.get('ItemCode')}, using open qty {open_qty}")
+                        logging.warning(
+                            f"Invalid qty '{receive_qty_str}' for item {line_data.get('ItemCode')}, using open qty"
+                        )
                         selected_qty = open_qty
-                
+
                 if selected_qty > 0:
-                    # Check if line already exists to prevent duplicates
                     existing_line = MultiGRNLineSelection.query.filter_by(
                         po_link_id=po_link.id,
                         po_line_num=line_data['LineNum'],
                         item_code=line_data['ItemCode']
                     ).first()
-                    
+
                     if not existing_line:
-                        # CRITICAL FIX: Validate item with SAP to get correct batch/serial/management flags
                         item_code = line_data['ItemCode']
                         validation_result = sap_service.validate_item_code(item_code)
-                        
-                        # Extract validation data or use safe defaults
+
                         if validation_result.get('success'):
-                            batch_required = 'Y' if validation_result.get('batch_managed', False) else 'N'
-                            serial_required = 'Y' if validation_result.get('serial_managed', False) else 'N'
+                            batch_required = 'Y' if validation_result.get('batch_managed') else 'N'
+                            serial_required = 'Y' if validation_result.get('serial_managed') else 'N'
                             manage_method = validation_result.get('management_method', 'A')
                             inventory_type = validation_result.get('inventory_type', 'standard')
                         else:
-                            # Validation failed - use safe defaults (standard item)
-                            logging.warning(f"⚠️ SAP validation failed for {item_code}: {validation_result.get('error')}")
+                            logging.warning(
+                                f"SAP validation failed for {item_code}: {validation_result.get('error')}"
+                            )
                             batch_required = 'N'
                             serial_required = 'N'
                             manage_method = 'A'
                             inventory_type = 'standard'
-                        
+
                         line_selection = MultiGRNLineSelection(
                             po_link_id=po_link.id,
                             po_line_num=line_data['LineNum'],
                             item_code=item_code,
                             item_description=line_data.get('ItemDescription', ''),
                             ordered_quantity=Decimal(str(line_data.get('Quantity', 0))),
-                            open_quantity=Decimal(str(line_data.get('RemainingOpenQuantity'))),
+                            open_quantity=Decimal(str(line_data.get('RemainingOpenQuantity', 0))),
                             selected_quantity=selected_qty,
                             warehouse_code=line_data.get('WarehouseCode', ''),
                             unit_price=Decimal(str(line_data.get('UnitPrice', 0))),
@@ -625,42 +632,75 @@ def create_step3_select_lines(batch_id):
                         )
                         db.session.add(line_selection)
                     else:
-                        # Update existing line with new quantity
                         existing_line.selected_quantity = selected_qty
-        
+
         db.session.commit()
-        logging.info(f"✅ Line items selected for batch {batch_id}")
+        logging.info(f"Line items selected for batch {batch_id}")
         flash('Line items selected successfully', 'success')
-        
-        # After selection, redirect to Step 3 details page
-        # Note: The GET handler uses has_lines to determine which template to show
+
         return redirect(url_for('multi_grn.create_step3_select_lines', batch_id=batch_id))
 
-    def wants_json():
-        return request.headers.get('Accept') == 'application/json' or request.is_json
-    # GET request
-    # Check for saved line selections
-    saved_lines_count = db.session.query(MultiGRNLineSelection).join(MultiGRNPOLink).filter(MultiGRNPOLink.batch_id == batch.id).count()
-    has_lines = saved_lines_count > 0
+    # =========================
+    # GET: Fetch lines or details
+    # =========================
+    saved_lines_count = (
+        db.session.query(MultiGRNLineSelection)
+        .join(MultiGRNPOLink)
+        .filter(MultiGRNPOLink.batch_id == batch.id)
+        .count()
+    )
 
-    po_details = []
+    has_lines = saved_lines_count > 0
     sap_service = SAPMultiGRNService()
-    
-    # If we have lines, we show the detail entry screen
+
+    # ---- If lines already saved (detail screen) ----
     if has_lines:
+        if wants_json():
+            lines = (
+                db.session.query(MultiGRNLineSelection)
+                .join(MultiGRNPOLink)
+                .filter(MultiGRNPOLink.batch_id == batch.id)
+                .all()
+            )
+
+            return jsonify({
+                "batch_id": batch.id,
+                "has_lines": True,
+                "lines": [
+                    {
+                        "id": line.id,
+                        "po_link_id": line.po_link_id,
+                        "po_line_num": line.po_line_num,
+                        "item_code": line.item_code,
+                        "item_description": line.item_description,
+                        "ordered_quantity": float(line.ordered_quantity),
+                        "open_quantity": float(line.open_quantity),
+                        "selected_quantity": float(line.selected_quantity),
+                        "warehouse_code": line.warehouse_code,
+                        "unit_price": float(line.unit_price),
+                        "line_status": line.line_status,
+                        "inventory_type": line.inventory_type,
+                        "batch_required": line.batch_required,
+                        "serial_required": line.serial_required,
+                        "manage_method": line.manage_method
+                    }
+                    for line in lines
+                ]
+            })
         return render_template('multi_grn/step3_detail.html', batch=batch)
-        
-    # Otherwise, fetch lines from SAP for the selection screen
+
+    # ---- Otherwise fetch PO open lines from SAP ----
+    po_details = []
+
     for po_link in batch.po_links:
-        # Fetch lines from SAP for this PO
         lines_result = sap_service.fetch_po_lines_by_docentry(po_link.po_doc_entry)
-        if lines_result['success']:
+        if lines_result.get('success'):
             po_data = lines_result.get('purchase_order', {})
             po_lines = po_data.get('OpenLines', [])
             po_details.append({
-                'po_id': po_link.id,
-                'po_num': po_link.po_doc_num,
-                'lines': po_lines
+                "po_id": po_link.id,
+                "po_num": po_link.po_doc_num,
+                "lines": po_lines
             })
 
     if wants_json():
@@ -670,7 +710,154 @@ def create_step3_select_lines(batch_id):
             "po_details": po_details
         })
 
-    return render_template('multi_grn/step3_select_lines.html', batch=batch, po_details=po_details)
+    return render_template(
+        'multi_grn/step3_select_lines.html',
+        batch=batch,
+        po_details=po_details
+    )
+
+
+# @multi_grn_bp.route('/create/step3/<int:batch_id>', methods=['GET', 'POST'])
+# @login_required
+# def create_step3_select_lines(batch_id):
+#     """Step 3: Select line items from POs and manage item details"""
+#     batch = MultiGRNBatch.query.get_or_404(batch_id)
+#
+#     if batch.user_id != current_user.id:
+#         flash('Access denied', 'error')
+#         return redirect(url_for('multi_grn.index'))
+#
+#     if request.method == 'POST':
+#         # Process line selection from Step 2 (initial selection)
+#         sap_service = SAPMultiGRNService()
+#
+#         for po_link in batch.po_links:
+#             selected_lines = request.form.getlist(f'lines_po_{po_link.id}[]')
+#
+#             for line_data_json in selected_lines:
+#                 line_data = json.loads(line_data_json)
+#                 qty_key = f'qty_po_{po_link.id}_line_{line_data["LineNum"]}'
+#
+#                 # Sanitize open_qty from SAP - ensure it's a valid number
+#                 raw_open_qty = line_data.get('OpenQuantity')
+#                 try:
+#                     open_qty = Decimal(str(raw_open_qty)) if raw_open_qty not in (None, '', 'None') else Decimal('0')
+#                 except (ValueError, InvalidOperation):
+#                     open_qty = Decimal('0')
+#
+#                 # Handle empty receive quantity field - use open quantity as default
+#                 receive_qty_str = request.form.get(qty_key, '').strip()
+#                 if receive_qty_str == '' or receive_qty_str is None:
+#                     selected_qty = open_qty
+#                 else:
+#                     try:
+#                         selected_qty = Decimal(receive_qty_str)
+#                     except (ValueError, InvalidOperation):
+#                         # If invalid input, default to open quantity
+#                         logging.warning(f"Invalid receive quantity '{receive_qty_str}' for item {line_data.get('ItemCode')}, using open qty {open_qty}")
+#                         selected_qty = open_qty
+#
+#                 if selected_qty > 0:
+#                     # Check if line already exists to prevent duplicates
+#                     existing_line = MultiGRNLineSelection.query.filter_by(
+#                         po_link_id=po_link.id,
+#                         po_line_num=line_data['LineNum'],
+#                         item_code=line_data['ItemCode']
+#                     ).first()
+#
+#                     if not existing_line:
+#                         # CRITICAL FIX: Validate item with SAP to get correct batch/serial/management flags
+#                         item_code = line_data['ItemCode']
+#                         validation_result = sap_service.validate_item_code(item_code)
+#
+#                         # Extract validation data or use safe defaults
+#                         if validation_result.get('success'):
+#                             batch_required = 'Y' if validation_result.get('batch_managed', False) else 'N'
+#                             serial_required = 'Y' if validation_result.get('serial_managed', False) else 'N'
+#                             manage_method = validation_result.get('management_method', 'A')
+#                             inventory_type = validation_result.get('inventory_type', 'standard')
+#                         else:
+#                             # Validation failed - use safe defaults (standard item)
+#                             logging.warning(f"⚠️ SAP validation failed for {item_code}: {validation_result.get('error')}")
+#                             batch_required = 'N'
+#                             serial_required = 'N'
+#                             manage_method = 'A'
+#                             inventory_type = 'standard'
+#
+#                         line_selection = MultiGRNLineSelection(
+#                             po_link_id=po_link.id,
+#                             po_line_num=line_data['LineNum'],
+#                             item_code=item_code,
+#                             item_description=line_data.get('ItemDescription', ''),
+#                             ordered_quantity=Decimal(str(line_data.get('Quantity', 0))),
+#                             open_quantity=Decimal(str(line_data.get('RemainingOpenQuantity'))),
+#                             selected_quantity=selected_qty,
+#                             warehouse_code=line_data.get('WarehouseCode', ''),
+#                             unit_price=Decimal(str(line_data.get('UnitPrice', 0))),
+#                             line_status=line_data.get('LineStatus', ''),
+#                             inventory_type=inventory_type,
+#                             batch_required=batch_required,
+#                             serial_required=serial_required,
+#                             manage_method=manage_method
+#                         )
+#                         db.session.add(line_selection)
+#                     else:
+#                         # Update existing line with new quantity
+#                         existing_line.selected_quantity = selected_qty
+#
+#         db.session.commit()
+#         logging.info(f"✅ Line items selected for batch {batch_id}")
+#         flash('Line items selected successfully', 'success')
+#
+#         # After selection, redirect to Step 3 details page
+#         # Note: The GET handler uses has_lines to determine which template to show
+#         return redirect(url_for('multi_grn.create_step3_select_lines', batch_id=batch_id))
+#
+#     def wants_json():
+#         #return request.headers.get('Content-Type') == 'application/json' or request.is_json
+#         return(request.is_json or
+#         request.headers.get('Content-Type') == 'application/json' or
+#         request.headers.get('Accept') == 'application/json')
+#     # GET request
+#     # Check for saved line selections
+#     saved_lines_count = db.session.query(MultiGRNLineSelection).join(MultiGRNPOLink).filter(MultiGRNPOLink.batch_id == batch.id).count()
+#     has_lines = saved_lines_count > 0
+#
+#     po_details = []
+#     sap_service = SAPMultiGRNService()
+#
+#     # If we have lines, we show the detail entry screen
+#     # if has_lines:
+#     #     return render_template('multi_grn/step3_detail.html', batch=batch)
+#     if has_lines:
+#         if wants_json():
+#             return jsonify({
+#                 "batch_id": batch.id,
+#                 "has_lines": True,
+#                 "message": "Line selections already exist",
+#             })
+#         return render_template('multi_grn/step3_detail.html', batch=batch)
+#     # Otherwise, fetch lines from SAP for the selection screen
+#     for po_link in batch.po_links:
+#         # Fetch lines from SAP for this PO
+#         lines_result = sap_service.fetch_po_lines_by_docentry(po_link.po_doc_entry)
+#         if lines_result['success']:
+#             po_data = lines_result.get('purchase_order', {})
+#             po_lines = po_data.get('OpenLines', [])
+#             po_details.append({
+#                 'po_id': po_link.id,
+#                 'po_num': po_link.po_doc_num,
+#                 'lines': po_lines
+#             })
+#
+#     if wants_json():
+#         return jsonify({
+#             "batch_id": batch.id,
+#             "has_lines": False,
+#             "po_details": po_details
+#         })
+#
+#     return render_template('multi_grn/step3_select_lines.html', batch=batch, po_details=po_details)
 
 @multi_grn_bp.route('/create/step4/<int:batch_id>')
 @login_required
