@@ -1545,12 +1545,35 @@ def api_get_multi_grn_batches():
             batches = MultiGRNBatch.query.all()
         else:
             batches = MultiGRNBatch.query.filter_by(user_id=current_user.id).all()
-        
+
         return jsonify({
             'success': True,
             'data': [serialize_model(b) for b in batches],
             'count': len(batches)
         })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/rest/multi-grn-draft-batches', methods=['GET'])
+@require_permission('multiple_grn')
+@login_required
+def api_get_multi_grn_draft_batches():
+    """GET list of multi GRN batches - Draft documents only"""
+    try:
+        if check_admin_permission():
+            batches = MultiGRNBatch.query.filter_by(status='draft').all()
+        else:
+            batches = MultiGRNBatch.query.filter_by(
+                user_id=current_user.id,
+                status='draft'
+            ).all()
+
+        return jsonify({
+            'success': True,
+            'data': [serialize_model(b) for b in batches],
+            'count': len(batches)
+        })
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

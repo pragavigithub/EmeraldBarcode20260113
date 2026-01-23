@@ -1401,7 +1401,7 @@ def qc_review_batchs(batch_id):
             return redirect(url_for('dashboard'))
 
         # --- Status check ---
-        if batch.status not in ['submitted', 'qc_approved','posted','failed']:
+        if batch.status not in ['submitted', 'qc_approved','posted','failed','draft']:
             msg = 'Only submitted batches can be reviewed'
             if _wants_json():
                 return jsonify({"success": False, "error": msg}), 400
