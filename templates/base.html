@@ -99,7 +99,7 @@
                 <!--                        </a>-->
                 <!--                    </li>-->
                 <!--                    {% endif %}-->
-                {% if current_user.has_permission('inventory_transfer') or current_user.has_permission('direct_inventory_transfer') or current_user.has_permission('inventory_counting') %}
+                {% if current_user.has_permission('inventory_transfer') or current_user.has_permission('direct_inventory_transfer') or current_user.has_permission('inventory_counting') or current_user.has_permission('grpo_transfer') %}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="inventoryDropdown" role="button"
                        data-bs-toggle="dropdown" aria-expanded="false">
@@ -124,6 +124,13 @@
                         <li>
                             <a class="dropdown-item" href="{{ url_for('inventory_counting_sap') }}">
                                 <i data-feather="check-square" style="width: 16px; height: 16px;"></i> Inventory Counting
+                            </a>
+                        </li>
+                        {% endif %}
+                        {% if current_user.has_permission('grpo_transfer') %}
+                        <li>
+                            <a class="dropdown-item" href="{{ url_for('grpo_transfer.index') }}">
+                                <i data-feather="arrow-right" style="width: 16px; height: 16px;"></i> GRPO Transfer
                             </a>
                         </li>
                         {% endif %}

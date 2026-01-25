@@ -95,6 +95,18 @@
         </div>
     </div>
     {% endif %}
+
+    {% if current_user.has_permission('grpo_transfer') %}
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card dashboard-card" data-url="{{ url_for('grpo_transfer.index') }}">
+            <div class="card-body text-center">
+                <i data-feather="arrow-right" class="mb-3" style="width: 48px; height: 48px;"></i>
+                <h3 id="grpo_transfer_count">0</h3>
+                <p>GRPO Transfers</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Quick Actions -->
@@ -291,5 +303,17 @@ setInterval(function() {
     // This could fetch real-time updates from the server
     console.log('Checking for updates...');
 }, 30000); // Check every 30 seconds
+
+// Load GRPO Transfer count
+{% if current_user.has_permission('grpo_transfer') %}
+fetch('{{ url_for("grpo_transfer.get_sessions") }}')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('grpo_transfer_count').textContent = data.sessions.length;
+        }
+    })
+    .catch(error => console.error('Error loading GRPO Transfer count:', error));
+{% endif %}
 </script>
 {% endblock %}
