@@ -594,83 +594,249 @@ function printLabels() {
     window.print();
 }
 
+let currentEditItemId = null;
+let warehousesList = [];
+
 function editItem(itemId) {
-    // Get item data from the table row
-    const row = document.querySelector(`button[onclick="editItem(${itemId})"]`).closest('tr');
+    currentEditItemId = itemId;
     
-    if (!row) {
-        alert('Item row not found');
-        return;
-    }
+    // Show loading in modal
+    document.getElementById('itemEditContent').innerHTML = '<div class="text-center"><div class="spinner-border" role="status"></div><p>Loading item data...</p></div>';
     
-    // Extract data from table cells
-    const cells = row.querySelectorAll('td');
-    const itemCode = cells[0].textContent.trim();
-    const itemName = cells[1].textContent.trim();
-    const receivedQty = parseFloat(cells[3].textContent.trim());
-    const approvedQty = parseFloat(cells[4].textContent.trim());
-    const rejectedQty = parseFloat(cells[5].textContent.trim());
+    const modal = new bootstrap.Modal(document.getElementById('itemEditModal'));
+    modal.show();
     
+    // Fetch item data from API
+    fetch(`/grpo-transfer/api/item/${itemId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                renderItemEditForm(data.item);
+            } else {
+                document.getElementById('itemEditContent').innerHTML = `<div class="alert alert-danger">Error loading item: ${data.error}</div>`;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('itemEditContent').innerHTML = `<div class="alert alert-danger">Error loading item data</div>`;
+        });
+}
+
+function renderItemEditForm(item) {
     const content = `
         <form id="itemEditForm">
             <div class="row mb-3">
                 <div class="col-md-6">
                     <label class="form-label">Item Code</label>
-                    <input type="text" class="form-control" value="${itemCode}" disabled>
+                    <input type="text" class="form-control" value="${item.item_code}" disabled>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label">Item Name</label>
-                    <input type="text" class="form-control" value="${itemName}" disabled>
+                    <input type="text" class="form-control" value="${item.item_name}" disabled>
                 </div>
             </div>
             
             <div class="row mb-3">
                 <div class="col-md-3">
                     <label class="form-label">Received Qty</label>
-                    <input type="number" class="form-control" value="${receivedQty}" disabled>
+                    <input type="number" class="form-control" value="${item.received_quantity}" disabled>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Approved Qty</label>
-                    <input type="number" class="form-control" id="editApprovedQty" value="${approvedQty}">
+                    <input type="number" class="form-control" id="editApprovedQty" value="${item.approved_quantity || 0}" min="0" max="${item.received_quantity}">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Rejected Qty</label>
-                    <input type="number" class="form-control" id="editRejectedQty" value="${rejectedQty}">
+                    <input type="number" class="form-control" id="editRejectedQty" value="${item.rejected_quantity || 0}" min="0">
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Status</label>
                     <select class="form-select" id="editStatus">
-                        <option value="pending">Pending</option>
-                        <option value="approved">Approved</option>
-                        <option value="rejected">Rejected</option>
-                        <option value="partial">Partial</option>
+                        <option value="pending" ${item.qc_status === 'pending' ? 'selected' : ''}>Pending</option>
+                        <option value="approved" ${item.qc_status === 'approved' ? 'selected' : ''}>Approved</option>
+                        <option value="rejected" ${item.qc_status === 'rejected' ? 'selected' : ''}>Rejected</option>
+                        <option value="partial" ${item.qc_status === 'partial' ? 'selected' : ''}>Partial</option>
                     </select>
                 </div>
             </div>
             
             <div class="row mb-3">
                 <div class="col-md-6">
-                    <label class="form-label">To Warehouse</label>
-                    <input type="text" class="form-control" id="editWarehouse" placeholder="Select warehouse">
+                    <label class="form-label">From Warehouse</label>
+                    <input type="text" class="form-control" value="${item.from_warehouse || ''}" disabled>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label">To Bin Code</label>
-                    <input type="text" class="form-control" id="editBin" placeholder="Select bin">
+                    <label class="form-label">From Bin Code</label>
+                    <input type="text" class="form-control" value="${item.from_bin_code || ''}" disabled>
                 </div>
             </div>
             
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">To Warehouse</label>
+                    <select class="form-select" id="editToWarehouse">
+                        <option value="">-- Select Warehouse --</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">To Bin Code</label>
+                    <select class="form-select" id="editToBin">
+                        <option value="">-- Select Bin --</option>
+                    </select>
+                </div>
+            </div>
+            
+            ${item.batches && item.batches.length > 0 ? `
+            <div class="mb-3">
+                <label class="form-label">Batch Information</label>
+                <table class="table table-sm table-bordered">
+                    <thead>
+                        <tr>
+                            <th>Batch Number</th>
+                            <th>Quantity</th>
+                            <th>Expiry Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${item.batches.map(batch => `
+                            <tr>
+                                <td>${batch.batch_number}</td>
+                                <td>${batch.batch_quantity}</td>
+                                <td>${batch.expiry_date || 'N/A'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            ` : ''}
+            
             <div class="mb-3">
                 <label class="form-label">QC Notes</label>
-                <textarea class="form-control" id="editNotes" rows="3"></textarea>
+                <textarea class="form-control" id="editNotes" rows="3">${item.qc_notes || ''}</textarea>
             </div>
         </form>
     `;
     
     document.getElementById('itemEditContent').innerHTML = content;
     
-    // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('itemEditModal'));
-    modal.show();
+    // Load warehouses into dropdown
+    loadWarehousesForEdit(item.to_warehouse);
+    
+    // Add change listener for warehouse to load bins
+    document.getElementById('editToWarehouse').addEventListener('change', function() {
+        loadBinCodesForEdit(this.value, item.to_bin_code);
+    });
 }
+
+function loadWarehousesForEdit(selectedWarehouse) {
+    fetch('/grpo-transfer/api/warehouses')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.warehouses) {
+                const select = document.getElementById('editToWarehouse');
+                data.warehouses.forEach(wh => {
+                    const option = document.createElement('option');
+                    option.value = wh.WarehouseCode;
+                    option.textContent = `${wh.WarehouseCode} - ${wh.WarehouseName}`;
+                    if (wh.WarehouseCode === selectedWarehouse) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+                
+                // If warehouse is selected, load bins
+                if (selectedWarehouse) {
+                    loadBinCodesForEdit(selectedWarehouse, null);
+                }
+            }
+        })
+        .catch(error => console.error('Error loading warehouses:', error));
+}
+
+function loadBinCodesForEdit(warehouseCode, selectedBin) {
+    if (!warehouseCode) return;
+    
+    fetch(`/grpo-transfer/api/bin-codes/${warehouseCode}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.bins) {
+                const select = document.getElementById('editToBin');
+                // Clear existing options
+                select.innerHTML = '<option value="">-- Select Bin --</option>';
+                
+                data.bins.forEach(bin => {
+                    const option = document.createElement('option');
+                    option.value = bin.BinCode;
+                    option.textContent = bin.BinCode;
+                    option.dataset.absEntry = bin.AbsEntry;
+                    if (bin.BinCode === selectedBin) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => console.error('Error loading bin codes:', error));
+}
+
+function saveItem() {
+    if (!currentEditItemId) {
+        alert('No item selected');
+        return;
+    }
+    
+    const approvedQty = parseFloat(document.getElementById('editApprovedQty').value) || 0;
+    const rejectedQty = parseFloat(document.getElementById('editRejectedQty').value) || 0;
+    const status = document.getElementById('editStatus').value;
+    const toWarehouse = document.getElementById('editToWarehouse').value;
+    const toBin = document.getElementById('editToBin').value;
+    const notes = document.getElementById('editNotes').value;
+    
+    const saveBtn = document.getElementById('saveItemBtn');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+    
+    fetch(`/grpo-transfer/api/item/${currentEditItemId}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            approved_quantity: approvedQty,
+            rejected_quantity: rejectedQty,
+            qc_status: status,
+            to_warehouse: toWarehouse,
+            to_bin_code: toBin,
+            qc_notes: notes
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = 'Save Changes';
+        
+        if (data.success) {
+            alert('Item updated successfully!');
+            // Close modal and refresh page
+            const modal = bootstrap.Modal.getInstance(document.getElementById('itemEditModal'));
+            modal.hide();
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to update item'));
+        }
+    })
+    .catch(error => {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = 'Save Changes';
+        console.error('Error:', error);
+        alert('Error saving item: ' + error.message);
+    });
+}
+
+// Attach save button handler
+document.addEventListener('DOMContentLoaded', function() {
+    const saveBtn = document.getElementById('saveItemBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', saveItem);
+    }
+});
 </script>
 {% endblock %}

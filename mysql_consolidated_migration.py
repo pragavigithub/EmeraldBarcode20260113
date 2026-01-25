@@ -47,6 +47,13 @@ RECENT UPDATES (Nov 2025):
   * QR scan now auto-fills From Bin Location and Batch Number from decoded QR data
   * Batch accumulation: scanning same batch adds qty up to requested limit
   * SAP B1 POST JSON now supports BatchNumbers array with multiple batches
+- Added GRPO Transfer Module tables - Jan 2026
+  * grpo_transfer_sessions: QC validation session for GRPO documents
+  * grpo_transfer_items: Line items with batch/serial/non-managed support
+  * grpo_transfer_batches: Batch numbers for batch-managed items
+  * grpo_transfer_splits: Split quantities for partial QC approval
+  * grpo_transfer_logs: Audit log for all transfer activities
+  * grpo_transfer_qr_labels: QR labels for approved items
 
 Run with: python mysql_consolidated_migration.py
 """
@@ -716,6 +723,148 @@ class MySQLConsolidatedMigration:
                     INDEX idx_barcode (barcode),
                     INDEX idx_qc_status (qc_status),
                     INDEX idx_validation_status (validation_status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ''',
+            
+            # 23. GRPO Transfer Sessions
+            'grpo_transfer_sessions': '''
+                CREATE TABLE IF NOT EXISTS grpo_transfer_sessions (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    session_code VARCHAR(50) NOT NULL UNIQUE,
+                    grpo_doc_entry INT NOT NULL,
+                    grpo_doc_num VARCHAR(50) NOT NULL,
+                    series_id INT NOT NULL,
+                    vendor_code VARCHAR(50) NOT NULL,
+                    vendor_name VARCHAR(255) NOT NULL,
+                    doc_date DATE NOT NULL,
+                    doc_due_date DATE,
+                    doc_total DECIMAL(15,4) DEFAULT 0.0,
+                    status VARCHAR(20) DEFAULT 'draft',
+                    qc_approved_by INT,
+                    transfer_doc_entry INT,
+                    transfer_doc_num VARCHAR(50),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (qc_approved_by) REFERENCES users(id) ON DELETE SET NULL,
+                    INDEX idx_session_code (session_code),
+                    INDEX idx_grpo_doc_entry (grpo_doc_entry),
+                    INDEX idx_status (status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ''',
+            
+            # 24. GRPO Transfer Items
+            'grpo_transfer_items': '''
+                CREATE TABLE IF NOT EXISTS grpo_transfer_items (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    session_id INT NOT NULL,
+                    line_num INT NOT NULL,
+                    item_code VARCHAR(50) NOT NULL,
+                    item_name VARCHAR(255) NOT NULL,
+                    item_description VARCHAR(500),
+                    is_batch_item TINYINT(1) DEFAULT 0,
+                    is_serial_item TINYINT(1) DEFAULT 0,
+                    is_non_managed TINYINT(1) DEFAULT 0,
+                    received_quantity DECIMAL(15,4) NOT NULL,
+                    approved_quantity DECIMAL(15,4) DEFAULT 0.0,
+                    rejected_quantity DECIMAL(15,4) DEFAULT 0.0,
+                    from_warehouse VARCHAR(50) NOT NULL,
+                    from_bin_code VARCHAR(100),
+                    to_warehouse VARCHAR(50),
+                    to_bin_code VARCHAR(100),
+                    unit_of_measure VARCHAR(20) DEFAULT '1',
+                    price DECIMAL(15,4) DEFAULT 0.0,
+                    line_total DECIMAL(15,4) DEFAULT 0.0,
+                    qc_status VARCHAR(20) DEFAULT 'pending',
+                    qc_notes TEXT,
+                    sap_base_entry INT,
+                    sap_base_line INT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (session_id) REFERENCES grpo_transfer_sessions(id) ON DELETE CASCADE,
+                    INDEX idx_session_id (session_id),
+                    INDEX idx_item_code (item_code),
+                    INDEX idx_qc_status (qc_status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ''',
+            
+            # 25. GRPO Transfer Batches
+            'grpo_transfer_batches': '''
+                CREATE TABLE IF NOT EXISTS grpo_transfer_batches (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    item_id INT NOT NULL,
+                    batch_number VARCHAR(100) NOT NULL,
+                    batch_quantity DECIMAL(15,4) NOT NULL,
+                    approved_quantity DECIMAL(15,4) DEFAULT 0.0,
+                    rejected_quantity DECIMAL(15,4) DEFAULT 0.0,
+                    expiry_date DATE,
+                    manufacture_date DATE,
+                    qc_status VARCHAR(20) DEFAULT 'pending',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (item_id) REFERENCES grpo_transfer_items(id) ON DELETE CASCADE,
+                    INDEX idx_item_id (item_id),
+                    INDEX idx_batch_number (batch_number)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ''',
+            
+            # 26. GRPO Transfer Splits
+            'grpo_transfer_splits': '''
+                CREATE TABLE IF NOT EXISTS grpo_transfer_splits (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    item_id INT NOT NULL,
+                    split_number INT NOT NULL,
+                    quantity DECIMAL(15,4) NOT NULL,
+                    status VARCHAR(20) NOT NULL,
+                    from_warehouse VARCHAR(50) NOT NULL,
+                    from_bin_code VARCHAR(100),
+                    to_warehouse VARCHAR(50) NOT NULL,
+                    to_bin_code VARCHAR(100),
+                    batch_number VARCHAR(100),
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (item_id) REFERENCES grpo_transfer_items(id) ON DELETE CASCADE,
+                    INDEX idx_item_id (item_id),
+                    INDEX idx_status (status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ''',
+            
+            # 27. GRPO Transfer Logs
+            'grpo_transfer_logs': '''
+                CREATE TABLE IF NOT EXISTS grpo_transfer_logs (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    session_id INT NOT NULL,
+                    user_id INT NOT NULL,
+                    action VARCHAR(100) NOT NULL,
+                    description TEXT,
+                    sap_response TEXT,
+                    status VARCHAR(20) DEFAULT 'success',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (session_id) REFERENCES grpo_transfer_sessions(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                    INDEX idx_session_id (session_id),
+                    INDEX idx_action (action)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ''',
+            
+            # 28. GRPO Transfer QR Labels
+            'grpo_transfer_qr_labels': '''
+                CREATE TABLE IF NOT EXISTS grpo_transfer_qr_labels (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    session_id INT NOT NULL,
+                    item_id INT NOT NULL,
+                    label_number INT NOT NULL,
+                    total_labels INT NOT NULL,
+                    qr_data TEXT NOT NULL,
+                    batch_number VARCHAR(100),
+                    quantity DECIMAL(15,4) NOT NULL,
+                    from_warehouse VARCHAR(50) NOT NULL,
+                    to_warehouse VARCHAR(50) NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (session_id) REFERENCES grpo_transfer_sessions(id) ON DELETE CASCADE,
+                    FOREIGN KEY (item_id) REFERENCES grpo_transfer_items(id) ON DELETE CASCADE,
+                    INDEX idx_session_id (session_id),
+                    INDEX idx_item_id (item_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
             '''
         }

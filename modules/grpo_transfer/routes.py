@@ -710,6 +710,133 @@ def get_bin_codes(warehouse_code):
         }), 500
 
 # ============================================================================
+# STEP 8.5: Get Item Details
+# ============================================================================
+
+@grpo_transfer_bp.route('/api/item/<int:item_id>', methods=['GET'])
+@login_required
+def get_item_details(item_id):
+    """Get single item details"""
+    try:
+        item = GRPOTransferItem.query.get(item_id)
+        if not item:
+            return jsonify({
+                'success': False,
+                'error': 'Item not found'
+            }), 404
+        
+        # Get batch info if batch item
+        batches = []
+        for batch in item.batches:
+            batches.append({
+                'id': batch.id,
+                'batch_number': batch.batch_number,
+                'batch_quantity': batch.batch_quantity,
+                'approved_quantity': batch.approved_quantity,
+                'rejected_quantity': batch.rejected_quantity,
+                'expiry_date': batch.expiry_date.isoformat() if batch.expiry_date else None,
+                'manufacture_date': batch.manufacture_date.isoformat() if batch.manufacture_date else None,
+                'qc_status': batch.qc_status
+            })
+        
+        return jsonify({
+            'success': True,
+            'item': {
+                'id': item.id,
+                'item_code': item.item_code,
+                'item_name': item.item_name,
+                'item_description': item.item_description,
+                'is_batch_item': item.is_batch_item,
+                'is_serial_item': item.is_serial_item,
+                'is_non_managed': item.is_non_managed,
+                'received_quantity': item.received_quantity,
+                'approved_quantity': item.approved_quantity,
+                'rejected_quantity': item.rejected_quantity,
+                'from_warehouse': item.from_warehouse,
+                'from_bin_code': item.from_bin_code,
+                'to_warehouse': item.to_warehouse,
+                'to_bin_code': item.to_bin_code,
+                'unit_of_measure': item.unit_of_measure,
+                'price': item.price,
+                'line_total': item.line_total,
+                'qc_status': item.qc_status,
+                'qc_notes': item.qc_notes,
+                'sap_base_entry': item.sap_base_entry,
+                'sap_base_line': item.sap_base_line,
+                'batches': batches
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching item: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# ============================================================================
+# STEP 8.6: Update Item
+# ============================================================================
+
+@grpo_transfer_bp.route('/api/item/<int:item_id>', methods=['PUT'])
+@login_required
+def update_item(item_id):
+    """Update single item"""
+    try:
+        item = GRPOTransferItem.query.get(item_id)
+        if not item:
+            return jsonify({
+                'success': False,
+                'error': 'Item not found'
+            }), 404
+        
+        data = request.get_json()
+        
+        # Update item fields
+        if 'approved_quantity' in data:
+            item.approved_quantity = float(data['approved_quantity'])
+        if 'rejected_quantity' in data:
+            item.rejected_quantity = float(data['rejected_quantity'])
+        if 'qc_status' in data:
+            item.qc_status = data['qc_status']
+        if 'qc_notes' in data:
+            item.qc_notes = data['qc_notes']
+        if 'to_warehouse' in data:
+            item.to_warehouse = data['to_warehouse']
+        if 'to_bin_code' in data:
+            item.to_bin_code = data['to_bin_code']
+        if 'from_warehouse' in data:
+            item.from_warehouse = data['from_warehouse']
+        if 'from_bin_code' in data:
+            item.from_bin_code = data['from_bin_code']
+        
+        db.session.commit()
+        
+        # Log activity
+        log = GRPOTransferLog(
+            session_id=item.session_id,
+            user_id=current_user.id,
+            action='item_updated',
+            description=f'Updated item {item.item_code}: approved={item.approved_quantity}, rejected={item.rejected_quantity}, status={item.qc_status}'
+        )
+        db.session.add(log)
+        db.session.commit()
+        
+        logger.info(f"✅ Updated item {item_id}")
+        return jsonify({
+            'success': True,
+            'message': 'Item updated successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating item: {str(e)}")
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+# ============================================================================
 # STEP 9: Add Item to Session
 # ============================================================================
 
