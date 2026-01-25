@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block title %}GRPO Transfer Session - {{ session.session_code }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-exchange-alt"></i> Transfer Session</h2>
+            <p class="text-muted">{{ session.session_code }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('transfer_grpo.index') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-md-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Document Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="text-muted small">Vendor</label>
+                            <div class="fw-bold">{{ session.vendor_name }} ({{ session.vendor_code }})</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="text-muted small">Document Number</label>
+                            <div class="fw-bold">{{ session.grpo_doc_num }}</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="text-muted small">Date</label>
+                            <div class="fw-bold">{{ session.doc_date }}</div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Item Code</th>
+                                    <th>Description</th>
+                                    <th>Whse</th>
+                                    <th>Qty</th>
+                                    <th>Approved</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in session.items %}
+                                <tr>
+                                    <td class="fw-bold">{{ item.item_code }}</td>
+                                    <td>{{ item.item_name }}</td>
+                                    <td><span class="badge bg-secondary">{{ item.from_warehouse }}</span></td>
+                                    <td>{{ item.received_quantity }}</td>
+                                    <td class="text-success fw-bold">{{ item.approved_quantity }}</td>
+                                    <td>
+                                        <span class="badge {% if item.qc_status == 'approved' %}bg-success{% else %}bg-warning{% endif %}">
+                                            {{ item.qc_status|upper }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary btn-edit" onclick='openEditModal({{ {
+                                            "id": item.id,
+                                            "item_code": item.item_code,
+                                            "item_name": item.item_name,
+                                            "received_quantity": item.received_quantity,
+                                            "approved_quantity": item.approved_quantity,
+                                            "rejected_quantity": item.rejected_quantity,
+                                            "to_warehouse": item.to_warehouse,
+                                            "to_bin_code": item.to_bin_code,
+                                            "qc_notes": item.qc_notes
+                                        }|tojson }})'>
+                                            <i class="fas fa-edit"></i> Validate
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">Actions</h5>
+                </div>
+                <div class="card-body">
+                    <button id="btnGenerateLabels" class="btn btn-info w-100 mb-3 text-white">
+                        <i class="fas fa-qrcode"></i> Generate QR Labels
+                    </button>
+                    <button id="btnPostSAP" class="btn btn-primary w-100" disabled>
+                        <i class="fas fa-cloud-upload-alt"></i> Post to SAP B1
+                    </button>
+                </div>
+            </div>
+
+            <div id="labelsContainer" class="card shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Labels Preview</h5>
+                </div>
+                <div class="card-body" id="qrPreviewArea">
+                    <p class="text-center text-muted">No labels generated yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Item QC Validation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editForm">
+                    <input type="hidden" id="modalItemId">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Item Code</label>
+                            <input type="text" id="modalItemCode" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Item Name</label>
+                            <input type="text" id="modalItemName" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Received Qty</label>
+                            <input type="number" id="modalReceivedQty" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Approved Qty</label>
+                            <input type="number" id="modalApprovedQty" class="form-control" step="any">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Rejected Qty</label>
+                            <input type="number" id="modalRejectedQty" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">To Warehouse</label>
+                            <select id="modalToWhse" class="form-select" required></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">To Bin Code</label>
+                            <select id="modalToBin" class="form-select" required>
+                                <option value="">-- Select Bin --</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">QC Notes</label>
+                            <textarea id="modalNotes" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="btnSaveItem">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const editModal = new bootstrap.Modal(document.getElementById('editModal'));
+const sessionId = {{ session.id }};
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadWarehouses();
+    
+    document.getElementById('modalApprovedQty').oninput = () => {
+        const recv = parseFloat(document.getElementById('modalReceivedQty').value) || 0;
+        const apprv = parseFloat(document.getElementById('modalApprovedQty').value) || 0;
+        document.getElementById('modalRejectedQty').value = (recv - apprv).toFixed(2);
+    };
+
+    document.getElementById('modalToWhse').onchange = (e) => loadBins(e.target.value);
+    document.getElementById('btnSaveItem').onclick = saveItem;
+    document.getElementById('btnGenerateLabels').onclick = generateLabels;
+});
+
+async function loadWarehouses() {
+    const res = await fetch('/transfer-grpo/api/warehouses');
+    const data = await res.json();
+    const select = document.getElementById('modalToWhse');
+    select.innerHTML = '<option value="">-- Select Whse --</option>';
+    data.value.forEach(w => select.add(new Option(`${w.WarehouseCode} - ${w.WarehouseName}`, w.WarehouseCode)));
+}
+
+async function loadBins(whse) {
+    const select = document.getElementById('modalToBin');
+    select.innerHTML = '<option value="">Loading...</option>';
+    const res = await fetch(`/transfer-grpo/api/bin-locations/${whse}`);
+    const data = await res.json();
+    select.innerHTML = '<option value="">-- Select Bin --</option>';
+    data.value.forEach(b => select.add(new Option(b.BinCode, b.BinCode)));
+}
+
+function openEditModal(item) {
+    document.getElementById('modalItemId').value = item.id;
+    document.getElementById('modalItemCode').value = item.item_code;
+    document.getElementById('modalItemName').value = item.item_name;
+    document.getElementById('modalReceivedQty').value = item.received_quantity;
+    document.getElementById('modalApprovedQty').value = item.approved_quantity || item.received_quantity;
+    document.getElementById('modalRejectedQty').value = item.rejected_quantity || 0;
+    document.getElementById('modalToWhse').value = item.to_warehouse || '';
+    document.getElementById('modalNotes').value = item.qc_notes || '';
+    if (item.to_warehouse) loadBins(item.to_warehouse).then(() => {
+        document.getElementById('modalToBin').value = item.to_bin_code || '';
+    });
+    editModal.show();
+}
+
+async function saveItem() {
+    const data = {
+        item_id: document.getElementById('modalItemId').value,
+        approved_qty: document.getElementById('modalApprovedQty').value,
+        rejected_qty: document.getElementById('modalRejectedQty').value,
+        to_warehouse: document.getElementById('modalToWhse').value,
+        to_bin: document.getElementById('modalToBin').value,
+        notes: document.getElementById('modalNotes').value
+    };
+
+    const res = await fetch('/transfer-grpo/api/update-item', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    });
+    
+    if ((await res.json()).success) {
+        location.reload();
+    } else {
+        alert('Failed to save');
+    }
+}
+
+async function generateLabels() {
+    const res = await fetch(`/transfer-grpo/api/generate-labels/${sessionId}`, {method: 'POST'});
+    const data = await res.json();
+    if (data.success) {
+        alert('Labels generated successfully');
+        // Trigger print/view logic
+    } else {
+        alert('Error generating labels: ' + data.error);
+    }
+}
+</script>
+{% endblock %}

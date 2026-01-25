@@ -197,11 +197,14 @@ async function handleDocChange(e) {
 
     toggleLoading(true);
     try {
-        const res = await fetch(`/transfer-grpo/api/grpo-details/${docEntry}`);
+        const res = await fetch('/transfer-grpo/api/create-session', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({doc_entry: docEntry})
+        });
         const data = await res.json();
-        if (data.value && data.value.length > 0) {
-            displayDocDetails(data.value);
-            section.classList.remove('d-none');
+        if (data.success) {
+            window.location.href = `/transfer-grpo/session/${data.session_id}`;
         }
     } finally {
         toggleLoading(false);
