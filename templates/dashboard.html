@@ -12,18 +12,6 @@
 
 <!-- Statistics Cards -->
 <div class="row mb-4">
-    <!-- {% if current_user.has_permission('grpo') %}
-    <div class="col-md-3 col-sm-6 mb-3">
-        <div class="card dashboard-card" data-url="{{ url_for('grpo') }}">
-            <div class="card-body text-center">
-                <i data-feather="package" class="mb-3" style="width: 48px; height: 48px;"></i>
-                <h3>{{ stats.grpo_count }}</h3>
-                <p>GRN Documents</p>
-            </div>
-        </div>
-    </div>
-    {% endif %} -->
-
    {% if current_user.has_permission('multiple_grn') %}
    <div class="col-md-3 col-sm-6 mb-3">
        <div class="card dashboard-card" data-url="{{ url_for('multi_grn.index') }}">
@@ -60,30 +48,6 @@
     </div>
     {% endif %}
 
-<!--    {% if current_user.has_permission('pick_list') %}-->
-<!--    <div class="col-md-3 col-sm-6 mb-3">-->
-<!--        <div class="card dashboard-card" data-url="{{ url_for('pick_list') }}">-->
-<!--            <div class="card-body text-center">-->
-<!--                <i data-feather="list" class="mb-3" style="width: 48px; height: 48px;"></i>-->
-<!--                <h3>{{ stats.pick_list_count }}</h3>-->
-<!--                <p>Pick Lists</p>-->
-<!--            </div>-->
-<!--        </div>-->
-<!--    </div>-->
-<!--    {% endif %}-->
-
-<!--    {% if current_user.has_permission('inventory_counting') %}-->
-<!--    <div class="col-md-3 col-sm-6 mb-3">-->
-<!--        <div class="card dashboard-card" data-url="{{ url_for('inventory_counting') }}">-->
-<!--            <div class="card-body text-center">-->
-<!--                <i data-feather="check-square" class="mb-3" style="width: 48px; height: 48px;"></i>-->
-<!--                <h3>{{ stats.count_tasks }}</h3>-->
-<!--                <p>Count Tasks</p>-->
-<!--            </div>-->
-<!--        </div>-->
-<!--    </div>-->
-<!--    {% endif %}-->
-
     {% if current_user.has_permission('inventory_counting') %}
     <div class="col-md-3 col-sm-6 mb-3">
         <div class="card dashboard-card" data-url="{{ url_for('inventory_counting_history') }}">
@@ -100,7 +64,7 @@
     <div class="col-md-3 col-sm-6 mb-3">
         <div class="card dashboard-card" data-url="{{ url_for('grpo_transfer.index') }}">
             <div class="card-body text-center">
-                <i data-feather="arrow-right" class="mb-3" style="width: 48px; height: 48px;"></i>
+                <i data-feather="truck" class="mb-3" style="width: 48px; height: 48px;"></i>
                 <h3 id="grpo_transfer_count">0</h3>
                 <p>GRPO Transfers</p>
             </div>

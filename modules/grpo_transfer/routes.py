@@ -102,10 +102,11 @@ def create_session_view(doc_entry):
                 flash('No data found for this GRPO document', 'error')
                 return redirect(url_for('grpo_transfer.index'))
             
-            # Extract document details (same for all rows) and line items
-            doc_details = None
-            line_items = []
-            
+        # Extract document details (same for all rows) and line items
+        doc_details = None
+        line_items = []
+        
+        if value_list:
             for item in value_list:
                 if 'PurchaseDeliveryNotes' in item and not doc_details:
                     doc_details = item['PurchaseDeliveryNotes']
@@ -113,53 +114,55 @@ def create_session_view(doc_entry):
                 if 'PurchaseDeliveryNotes/DocumentLines' in item:
                     line_items.append(item['PurchaseDeliveryNotes/DocumentLines'])
             
+            if not doc_details:
+                logger.error("PurchaseDeliveryNotes details not found in response")
+                flash('Invalid data format from SAP', 'error')
+                return redirect(url_for('grpo_transfer.index'))
+
             logger.info(f"✅ Retrieved GRPO document {doc_entry} with {len(line_items)} line items")
             
             # Create session
             session_code = f"GRPO-{doc_entry}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
             
-            session = GRPOTransferSession(
-                session_code=session_code,
-                grpo_doc_entry=doc_entry,
-                grpo_doc_num=doc_details.get('DocNum'),
-                series_id=doc_details.get('Series'),
-                vendor_code=doc_details.get('CardCode'),
-                vendor_name=doc_details.get('CardName'),
-                doc_date=datetime.strptime(doc_details.get('DocDate', datetime.now().isoformat()), '%Y-%m-%d').date(),
-                doc_due_date=datetime.strptime(doc_details.get('DocDueDate', datetime.now().isoformat()), '%Y-%m-%d').date() if doc_details.get('DocDueDate') else None,
-                doc_total=float(doc_details.get('DocTotal', 0.0))
-            )
+            session = GRPOTransferSession()
+            session.session_code = session_code
+            session.grpo_doc_entry = doc_entry
+            session.grpo_doc_num = doc_details.get('DocNum')
+            session.series_id = doc_details.get('Series')
+            session.vendor_code = doc_details.get('CardCode')
+            session.vendor_name = doc_details.get('CardName')
+            session.doc_date = datetime.strptime(doc_details.get('DocDate', datetime.now().isoformat()), '%Y-%m-%d').date()
+            session.doc_due_date = datetime.strptime(doc_details.get('DocDueDate', datetime.now().isoformat()), '%Y-%m-%d').date() if doc_details.get('DocDueDate') else None
+            session.doc_total = float(doc_details.get('DocTotal', 0.0))
             
             db.session.add(session)
             db.session.flush()  # Flush to get session.id
             
             # Add line items to session
             for line in line_items:
-                item = GRPOTransferItem(
-                    session_id=session.id,
-                    line_num=line.get('LineNum'),
-                    item_code=line.get('ItemCode'),
-                    item_name=line.get('ItemDescription'),
-                    item_description=line.get('ItemDescription'),
-                    received_quantity=float(line.get('Quantity', 0)),
-                    from_warehouse=line.get('WarehouseCode'),
-                    unit_of_measure=line.get('UnitsOfMeasurment', 1),
-                    price=float(line.get('Price', 0)),
-                    line_total=float(line.get('LineTotal', 0)),
-                    sap_base_entry=doc_entry,
-                    sap_base_line=line.get('LineNum')
-                )
+                item = GRPOTransferItem()
+                item.session_id = session.id
+                item.line_num = line.get('LineNum')
+                item.item_code = line.get('ItemCode')
+                item.item_name = line.get('ItemDescription')
+                item.item_description = line.get('ItemDescription')
+                item.received_quantity = float(line.get('Quantity', 0))
+                item.from_warehouse = line.get('WarehouseCode')
+                item.unit_of_measure = str(line.get('UnitsOfMeasurment', '1'))
+                item.price = float(line.get('Price', 0))
+                item.line_total = float(line.get('LineTotal', 0))
+                item.sap_base_entry = doc_entry
+                item.sap_base_line = line.get('LineNum')
                 db.session.add(item)
             
             db.session.commit()
             
             # Log activity
-            log = GRPOTransferLog(
-                session_id=session.id,
-                user_id=current_user.id,
-                action='session_created',
-                description=f'Created transfer session for GRPO {doc_details.get("DocNum")} with {len(line_items)} items'
-            )
+            log = GRPOTransferLog()
+            log.session_id = session.id
+            log.user_id = current_user.id
+            log.action = 'session_created'
+            log.description = f'Created transfer session for GRPO {doc_details.get("DocNum")} with {len(line_items)} items'
             db.session.add(log)
             db.session.commit()
             
@@ -447,28 +450,26 @@ def create_session():
         session_code = f"GRPO-{data['grpo_doc_entry']}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
         # Create session
-        session = GRPOTransferSession(
-            session_code=session_code,
-            grpo_doc_entry=data['grpo_doc_entry'],
-            grpo_doc_num=data['grpo_doc_num'],
-            series_id=data['series_id'],
-            vendor_code=data['vendor_code'],
-            vendor_name=data['vendor_name'],
-            doc_date=datetime.strptime(data.get('doc_date', datetime.now().isoformat()), '%Y-%m-%d').date(),
-            doc_due_date=datetime.strptime(data.get('doc_due_date', datetime.now().isoformat()), '%Y-%m-%d').date() if data.get('doc_due_date') else None,
-            doc_total=float(data.get('doc_total', 0.0))
-        )
+        session = GRPOTransferSession()
+        session.session_code = session_code
+        session.grpo_doc_entry = data['grpo_doc_entry']
+        session.grpo_doc_num = data['grpo_doc_num']
+        session.series_id = data['series_id']
+        session.vendor_code = data['vendor_code']
+        session.vendor_name = data['vendor_name']
+        session.doc_date = datetime.strptime(data.get('doc_date', datetime.now().isoformat()), '%Y-%m-%d').date()
+        session.doc_due_date = datetime.strptime(data.get('doc_due_date', datetime.now().isoformat()), '%Y-%m-%d').date() if data.get('doc_due_date') else None
+        session.doc_total = float(data.get('doc_total', 0.0))
         
         db.session.add(session)
         db.session.commit()
         
         # Log activity
-        log = GRPOTransferLog(
-            session_id=session.id,
-            user_id=current_user.id,
-            action='session_created',
-            description=f'Created transfer session for GRPO {data["grpo_doc_num"]}'
-        )
+        log = GRPOTransferLog()
+        log.session_id = session.id
+        log.user_id = current_user.id
+        log.action = 'session_created'
+        log.description = f'Created transfer session for GRPO {data["grpo_doc_num"]}'
         db.session.add(log)
         db.session.commit()
         
