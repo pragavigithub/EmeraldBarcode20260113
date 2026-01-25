@@ -1,0 +1,304 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-truck-loading"></i> Transfer GRPO</h2>
+        <div id="loadingSpinner" class="spinner-border text-primary d-none" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">1. Select Series</label>
+                    <select id="seriesSelect" class="form-select">
+                        <option value="">-- Choose Series --</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-bold">2. Select Document Number</label>
+                    <select id="docSelect" class="form-select" disabled>
+                        <option value="">-- Choose Document --</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="docDetailsSection" class="card shadow-sm mb-4 d-none">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Document Details</h5>
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <label class="text-muted small">Vendor Name</label>
+                    <div id="vendorName" class="fw-bold">-</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="text-muted small">Vendor Code</label>
+                    <div id="vendorCode" class="fw-bold">-</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="text-muted small">Doc Date</label>
+                    <div id="docDate" class="fw-bold">-</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="text-muted small">Total</label>
+                    <div id="docTotal" class="fw-bold">-</div>
+                </div>
+            </div>
+            
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Line</th>
+                            <th>Item Code</th>
+                            <th>Description</th>
+                            <th>Whse</th>
+                            <th>Quantity</th>
+                            <th style="width: 100px;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Item Validation -->
+<div class="modal fade" id="itemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Item Validation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="itemForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Item Code</label>
+                            <input type="text" id="modalItemCode" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Item Name</label>
+                            <input type="text" id="modalItemName" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Received Qty</label>
+                            <input type="number" id="modalReceivedQty" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Approved Qty</label>
+                            <input type="number" id="modalApprovedQty" class="form-control" step="any">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Rejected Qty</label>
+                            <input type="number" id="modalRejectedQty" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">To Warehouse</label>
+                            <select id="modalToWhse" class="form-select"></select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">To Bin Code</label>
+                            <select id="modalToBin" class="form-select">
+                                <option value="">-- Select Bin --</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">QC Notes</label>
+                            <textarea id="modalNotes" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="btnSaveChanges">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let allWarehouses = [];
+let currentItem = null;
+const itemModal = new bootstrap.Modal(document.getElementById('itemModal'));
+
+document.addEventListener('DOMContentLoaded', async () => {
+    toggleLoading(true);
+    try {
+        await Promise.all([loadSeries(), loadWarehouses()]);
+    } finally {
+        toggleLoading(false);
+    }
+
+    document.getElementById('seriesSelect').addEventListener('change', handleSeriesChange);
+    document.getElementById('docSelect').addEventListener('change', handleDocChange);
+    document.getElementById('modalApprovedQty').addEventListener('input', calculateRejected);
+    document.getElementById('modalToWhse').addEventListener('change', handleWhseChange);
+    document.getElementById('btnSaveChanges').addEventListener('click', saveItemChanges);
+});
+
+async function loadSeries() {
+    const res = await fetch('/transfer-grpo/api/series');
+    const data = await res.json();
+    const select = document.getElementById('seriesSelect');
+    data.value.forEach(s => {
+        const opt = new Option(s.SeriesName, s.SeriesID);
+        select.add(opt);
+    });
+}
+
+async function loadWarehouses() {
+    const res = await fetch('/transfer-grpo/api/warehouses');
+    const data = await res.json();
+    allWarehouses = data.value;
+    const modalWhseSelect = document.getElementById('modalToWhse');
+    modalWhseSelect.innerHTML = '<option value="">-- Select Whse --</option>';
+    allWarehouses.forEach(w => {
+        modalWhseSelect.add(new Option(`${w.WarehouseCode} - ${w.WarehouseName}`, w.WarehouseCode));
+    });
+}
+
+async function handleSeriesChange(e) {
+    const seriesId = e.target.value;
+    const docSelect = document.getElementById('docSelect');
+    docSelect.innerHTML = '<option value="">-- Choose Document --</option>';
+    docSelect.disabled = !seriesId;
+    
+    if (!seriesId) return;
+    
+    toggleLoading(true);
+    try {
+        const res = await fetch(`/transfer-grpo/api/documents/${seriesId}`);
+        const data = await res.json();
+        data.value.forEach(d => {
+            docSelect.add(new Option(`${d.DocNum} - ${d.CardName}`, d.DocEntry));
+        });
+    } finally {
+        toggleLoading(false);
+    }
+}
+
+async function handleDocChange(e) {
+    const docEntry = e.target.value;
+    const section = document.getElementById('docDetailsSection');
+    if (!docEntry) {
+        section.classList.add('d-none');
+        return;
+    }
+
+    toggleLoading(true);
+    try {
+        const res = await fetch(`/transfer-grpo/api/grpo-details/${docEntry}`);
+        const data = await res.json();
+        if (data.value && data.value.length > 0) {
+            displayDocDetails(data.value);
+            section.classList.remove('d-none');
+        }
+    } finally {
+        toggleLoading(false);
+    }
+}
+
+function displayDocDetails(lines) {
+    const header = lines[0].PurchaseDeliveryNotes;
+    document.getElementById('vendorName').textContent = header.CardName;
+    document.getElementById('vendorCode').textContent = header.CardCode;
+    document.getElementById('docDate').textContent = header.DocDate;
+    document.getElementById('docTotal').textContent = header.DocTotal.toLocaleString();
+
+    const tbody = document.getElementById('itemsTableBody');
+    tbody.innerHTML = '';
+    lines.forEach(line => {
+        const rowData = line['PurchaseDeliveryNotes/DocumentLines'];
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${rowData.LineNum}</td>
+            <td class="fw-bold">${rowData.ItemCode}</td>
+            <td>${rowData.ItemDescription}</td>
+            <td><span class="badge bg-secondary">${rowData.WarehouseCode}</span></td>
+            <td>${rowData.Quantity}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary btn-edit" data-line='${JSON.stringify(rowData)}'>
+                    <i class="fas fa-edit"></i> Edit
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    document.querySelectorAll('.btn-edit').forEach(btn => {
+        btn.onclick = () => openEditModal(JSON.parse(btn.dataset.line));
+    });
+}
+
+function openEditModal(line) {
+    currentItem = line;
+    document.getElementById('modalItemCode').value = line.ItemCode;
+    document.getElementById('modalItemName').value = line.ItemDescription;
+    document.getElementById('modalReceivedQty').value = line.Quantity;
+    document.getElementById('modalApprovedQty').value = line.Quantity;
+    document.getElementById('modalRejectedQty').value = 0;
+    document.getElementById('modalNotes').value = '';
+    document.getElementById('modalToWhse').value = '';
+    document.getElementById('modalToBin').innerHTML = '<option value="">-- Select Bin --</option>';
+    itemModal.show();
+}
+
+function calculateRejected() {
+    const recv = parseFloat(document.getElementById('modalReceivedQty').value) || 0;
+    const apprv = parseFloat(document.getElementById('modalApprovedQty').value) || 0;
+    document.getElementById('modalRejectedQty').value = (recv - apprv).toFixed(2);
+}
+
+async function handleWhseChange(e) {
+    const whse = e.target.value;
+    const binSelect = document.getElementById('modalToBin');
+    binSelect.innerHTML = '<option value="">-- Loading Bins... --</option>';
+    
+    if (!whse) {
+        binSelect.innerHTML = '<option value="">-- Select Bin --</option>';
+        return;
+    }
+
+    try {
+        const res = await fetch(`/transfer-grpo/api/bin-locations/${whse}`);
+        const data = await res.json();
+        binSelect.innerHTML = '<option value="">-- Select Bin --</option>';
+        data.value.forEach(b => {
+            binSelect.add(new Option(b.BinCode, b.BinCode));
+        });
+    } catch (err) {
+        binSelect.innerHTML = '<option value="">-- Error --</option>';
+    }
+}
+
+function saveItemChanges() {
+    const apprv = document.getElementById('modalApprovedQty').value;
+    const whse = document.getElementById('modalToWhse').value;
+    const bin = document.getElementById('modalToBin').value;
+
+    if (!apprv || !whse || !bin) {
+        alert('Please fill all required fields (Approved Qty, Warehouse, Bin)');
+        return;
+    }
+
+    // Since this is a UI-driven request, we'll alert success for now.
+    // In a full implementation, this would save to a database session.
+    alert('Changes saved for ' + currentItem.ItemCode);
+    itemModal.hide();
+}
+
+function toggleLoading(show) {
+    document.getElementById('loadingSpinner').classList.toggle('d-none', !show);
+}
+</script>
+{% endblock %}

@@ -8,10 +8,12 @@ import routes
 import api_cascading_dropdowns
 from api_routes import register_api_routes
 from modules.grpo_transfer.routes import grpo_transfer_bp
+from modules.transfer_grpo.routes import transfer_grpo_bp
 
 # Initialize app components
 register_api_routes(app)
 app.register_blueprint(grpo_transfer_bp)
+app.register_blueprint(transfer_grpo_bp)
 
 if __name__ == "__main__":
     # Check if we're in Replit environment (skip license validation)
