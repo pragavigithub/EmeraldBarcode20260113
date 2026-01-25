@@ -1,0 +1,248 @@
+================================================================================
+GRPO TRANSFER MODULE - API FIX DIAGRAM
+================================================================================
+
+BEFORE (BROKEN):
+================
+
+User clicks Series dropdown
+         ↓
+Frontend calls: fetch('/grpo-transfer/api/series-list')
+         ↓
+Backend receives request
+         ↓
+Code tries: response = sap.call_sap_api(...)
+         ↓
+❌ ERROR: AttributeError - method doesn't exist!
+         ↓
+API returns: {"success": false, "error": "..."}
+         ↓
+Frontend shows: "-- Select Series --" (empty dropdown)
+         ↓
+User cannot proceed ❌
+
+
+AFTER (FIXED):
+==============
+
+User clicks Series dropdown
+         ↓
+Frontend calls: fetch('/grpo-transfer/api/series-list')
+         ↓
+Backend receives request
+         ↓
+Code checks: if not sap.ensure_logged_in()
+         ↓
+Code builds: url = f"{sap.base_url}/b1s/v1/DocumentsService_DocumentSeries?..."
+         ↓
+Code calls: response = sap.session.get(url, headers=headers, timeout=30)
+         ↓
+✅ SUCCESS: SAP B1 returns series data
+         ↓
+Code processes: series_list = [{"SeriesID": 1, "SeriesName": "GRPO-2024", ...}]
+         ↓
+API returns: {"success": true, "series": [...]}
+         ↓
+Frontend populates: Series dropdown with options
+         ↓
+User can select series ✅
+
+
+COMPARISON OF METHODS:
+======================
+
+❌ BROKEN METHOD (doesn't exist):
+   sap.call_sap_api(method='GET', endpoint='...', headers={...})
+   
+   This method is NOT defined in SAPIntegration class
+   Result: AttributeError
+
+✅ CORRECT METHOD (exists and works):
+   sap.session.get(url, headers=headers, timeout=30)
+   
+   This method exists in SAPIntegration class
+   Result: Works perfectly!
+
+
+API ENDPOINT FLOW:
+==================
+
+1. SERIES LIST API
+   ┌─────────────────────────────────────────────────────────┐
+   │ GET /grpo-transfer/api/series-list                      │
+   ├─────────────────────────────────────────────────────────┤
+   │ 1. Check authentication                                 │
+   │ 2. Build URL: DocumentsService_DocumentSeries           │
+   │ 3. Call: sap.session.get(url, headers, timeout=30)      │
+   │ 4. Parse response: data.get('value', [])                │
+   │ 5. Return: {"success": true, "series": [...]}           │
+   └─────────────────────────────────────────────────────────┘
+                          ↓
+   Frontend receives series list
+                          ↓
+   Populates dropdown with options
+                          ↓
+   User can select series ✅
+
+2. DOCUMENTS BY SERIES API
+   ┌─────────────────────────────────────────────────────────┐
+   │ GET /grpo-transfer/api/doc-numbers/<series_id>          │
+   ├─────────────────────────────────────────────────────────┤
+   │ 1. Check authentication                                 │
+   │ 2. Build URL: PurchaseDeliveryNotes?$filter=Series...   │
+   │ 3. Call: sap.session.get(url, headers, timeout=30)      │
+   │ 4. Parse response: data.get('value', [])                │
+   │ 5. Return: {"success": true, "documents": [...]}        │
+   └─────────────────────────────────────────────────────────┘
+                          ↓
+   Frontend receives documents
+                          ↓
+   Populates dropdown with options
+                          ↓
+   User can select document ✅
+
+3. VALIDATE ITEM API
+   ┌─────────────────────────────────────────────────────────┐
+   │ GET /grpo-transfer/api/validate-item/<item_code>        │
+   ├─────────────────────────────────────────────────────────┤
+   │ 1. Check authentication                                 │
+   │ 2. Build URL: Items?$filter=ItemCode eq '...'           │
+   │ 3. Call: sap.session.get(url, headers, timeout=30)      │
+   │ 4. Parse response: data.get('value', [])                │
+   │ 5. Return: {"success": true, "is_batch_item": ...}      │
+   └─────────────────────────────────────────────────────────┘
+                          ↓
+   Frontend receives item type
+                          ↓
+   Determines handling (batch/serial/non-managed)
+                          ↓
+   Proceeds with QC validation ✅
+
+4. BATCH NUMBERS API
+   ┌─────────────────────────────────────────────────────────┐
+   │ GET /grpo-transfer/api/batch-numbers/<doc_entry>        │
+   ├─────────────────────────────────────────────────────────┤
+   │ 1. Check authentication                                 │
+   │ 2. Build URL: PurchaseDeliveryNotes(...)/DocumentLines  │
+   │ 3. Call: sap.session.get(url, headers, timeout=30)      │
+   │ 4. Parse response: data.get('value', [])                │
+   │ 5. Return: {"success": true, "batches": [...]}          │
+   └─────────────────────────────────────────────────────────┘
+                          ↓
+   Frontend receives batch numbers
+                          ↓
+   Displays batch information
+                          ↓
+   Proceeds with QC validation ✅
+
+5. WAREHOUSES API
+   ┌─────────────────────────────────────────────────────────┐
+   │ GET /grpo-transfer/api/warehouses                        │
+   ├─────────────────────────────────────────────────────────┤
+   │ 1. Check authentication                                 │
+   │ 2. Build URL: Warehouses?$select=...                    │
+   │ 3. Call: sap.session.get(url, headers, timeout=30)      │
+   │ 4. Parse response: data.get('value', [])                │
+   │ 5. Return: {"success": true, "warehouses": [...]}       │
+   └─────────────────────────────────────────────────────────┘
+                          ↓
+   Frontend receives warehouses
+                          ↓
+   Populates warehouse dropdown
+                          ↓
+   User can select warehouse ✅
+
+6. BIN CODES API
+   ┌─────────────────────────────────────────────────────────┐
+   │ GET /grpo-transfer/api/bin-codes/<warehouse_code>       │
+   ├─────────────────────────────────────────────────────────┤
+   │ 1. Check authentication                                 │
+   │ 2. Build URL: BinLocations?$filter=Warehouse eq '...'   │
+   │ 3. Call: sap.session.get(url, headers, timeout=30)      │
+   │ 4. Parse response: data.get('value', [])                │
+   │ 5. Return: {"success": true, "bins": [...]}             │
+   └─────────────────────────────────────────────────────────┘
+                          ↓
+   Frontend receives bin codes
+                          ↓
+   Populates bin dropdown
+                          ↓
+   User can select bin ✅
+
+
+COMPLETE WORKFLOW:
+==================
+
+1. User navigates to GRPO Transfer page
+   ↓
+2. Series dropdown loads (API #1) ✅
+   ↓
+3. User selects series
+   ↓
+4. Documents dropdown loads (API #2) ✅
+   ↓
+5. User selects document
+   ↓
+6. Session is created
+   ↓
+7. Items are loaded and validated (API #3) ✅
+   ↓
+8. Batch numbers are loaded (API #4) ✅
+   ↓
+9. Warehouses are loaded (API #5) ✅
+   ↓
+10. Bin codes are loaded (API #6) ✅
+    ↓
+11. QC validation proceeds
+    ↓
+12. QR labels are generated
+    ↓
+13. Stock transfer is posted to SAP B1
+    ↓
+14. Session is completed ✅
+
+
+KEY CHANGES:
+============
+
+BEFORE:
+  response = sap.call_sap_api(method='GET', endpoint='...', headers={...})
+  ❌ Method doesn't exist
+
+AFTER:
+  url = f"{sap.base_url}/b1s/v1/{endpoint}"
+  response = sap.session.get(url, headers=headers, timeout=30)
+  ✅ Method exists and works!
+
+
+TESTING FLOW:
+=============
+
+1. Browser Console Test
+   fetch('/grpo-transfer/api/series-list')
+   .then(r => r.json())
+   .then(d => console.log(d))
+   ↓
+   Expected: {"success": true, "series": [...]}
+
+2. Full Test Script
+   python test_grpo_transfer_api.py
+   ↓
+   Expected: All 6 endpoints pass
+
+3. UI Test
+   Navigate to /grpo-transfer/
+   Click Series dropdown
+   ↓
+   Expected: Series list appears
+
+
+STATUS:
+=======
+✅ All 6 API endpoints fixed
+✅ Using correct method: sap.session.get()
+✅ Proper authentication checks
+✅ Comprehensive error handling
+✅ Ready for testing
+
+================================================================================

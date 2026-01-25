@@ -1,0 +1,676 @@
+{% extends "base.html" %}
+
+{% block title %}GRPO Transfer Session - {{ session.session_code }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i data-feather="truck"></i> Transfer Session</h2>
+                    <p class="text-muted">{{ session.session_code }}</p>
+                </div>
+                <div>
+                    <a href="{{ url_for('grpo_transfer.index') }}" class="btn btn-secondary">
+                        <i data-feather="arrow-left"></i> Back
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Session Info -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0">GRPO Document Details</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <p class="text-muted small">Document Number</p>
+                            <p><strong>{{ session.grpo_doc_num }}</strong></p>
+                        </div>
+                        <div class="col-6">
+                            <p class="text-muted small">Vendor</p>
+                            <p><strong>{{ session.vendor_name }}</strong></p>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-6">
+                            <p class="text-muted small">Document Date</p>
+                            <p><strong>{{ session.doc_date.strftime('%Y-%m-%d') }}</strong></p>
+                        </div>
+                        <div class="col-6">
+                            <p class="text-muted small">Total Amount</p>
+                            <p><strong>{{ "%.2f"|format(session.doc_total) }}</strong></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">Session Status</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6">
+                            <p class="text-muted small">Status</p>
+                            <p>
+                                {% if session.status == 'draft' %}
+                                    <span class="badge bg-secondary">Draft</span>
+                                {% elif session.status == 'in_progress' %}
+                                    <span class="badge bg-warning text-dark">In Progress</span>
+                                {% elif session.status == 'completed' %}
+                                    <span class="badge bg-success">Completed</span>
+                                {% elif session.status == 'transferred' %}
+                                    <span class="badge bg-info">Transferred</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-6">
+                            <p class="text-muted small">Items</p>
+                            <p><strong>{{ session.items|length }}</strong></p>
+                        </div>
+                    </div>
+                    {% if session.transfer_doc_num %}
+                    <div class="row">
+                        <div class="col-12">
+                            <p class="text-muted small">SAP Transfer Document</p>
+                            <p><strong>{{ session.transfer_doc_num }}</strong></p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="items-tab" data-bs-toggle="tab" data-bs-target="#items" type="button" role="tab">
+                <i data-feather="list"></i> Items ({{ session.items|length }})
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="qc-tab" data-bs-toggle="tab" data-bs-target="#qc" type="button" role="tab">
+                <i data-feather="check-circle"></i> QC Validation
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="labels-tab" data-bs-toggle="tab" data-bs-target="#labels" type="button" role="tab">
+                <i data-feather="tag"></i> QR Labels
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs" type="button" role="tab">
+                <i data-feather="activity"></i> Audit Log
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+        <!-- Items Tab -->
+        <div class="tab-pane fade show active" id="items" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Line Items</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Item Code</th>
+                                    <th>Description</th>
+                                    <th>Type</th>
+                                    <th>Received</th>
+                                    <th>Approved</th>
+                                    <th>Rejected</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in session.items %}
+                                <tr>
+                                    <td><strong>{{ item.item_code }}</strong></td>
+                                    <td>{{ item.item_name }}</td>
+                                    <td>
+                                        {% if item.is_batch_item %}
+                                            <span class="badge bg-primary">Batch</span>
+                                        {% elif item.is_serial_item %}
+                                            <span class="badge bg-success">Serial</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Non-Managed</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.received_quantity }}</td>
+                                    <td>{{ item.approved_quantity }}</td>
+                                    <td>{{ item.rejected_quantity }}</td>
+                                    <td>
+                                        {% if item.qc_status == 'pending' %}
+                                            <span class="badge bg-warning text-dark">Pending</span>
+                                        {% elif item.qc_status == 'approved' %}
+                                            <span class="badge bg-success">Approved</span>
+                                        {% elif item.qc_status == 'rejected' %}
+                                            <span class="badge bg-danger">Rejected</span>
+                                        {% elif item.qc_status == 'partial' %}
+                                            <span class="badge bg-info">Partial</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary" onclick="editItem({{ item.id }})">
+                                            <i data-feather="edit"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QC Validation Tab -->
+        <div class="tab-pane fade" id="qc" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">QC Validation & Approval</h6>
+                </div>
+                <div class="card-body">
+                    <form id="qcForm">
+                        <div id="qcItemsContainer"></div>
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-success">
+                                <i data-feather="check"></i> Submit QC Approval
+                            </button>
+                            <button type="reset" class="btn btn-secondary">
+                                <i data-feather="refresh-cw"></i> Reset
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Labels Tab -->
+        <div class="tab-pane fade" id="labels" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Generated QR Labels</h6>
+                        <button class="btn btn-sm btn-primary" id="generateLabelsBtn">
+                            <i data-feather="plus"></i> Generate Labels
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="labelsContainer" class="row"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Audit Log Tab -->
+        <div class="tab-pane fade" id="logs" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Activity Log</h6>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        {% for log in session.logs %}
+                        <div class="timeline-item">
+                            <div class="timeline-marker {% if log.status == 'success' %}bg-success{% elif log.status == 'error' %}bg-danger{% else %}bg-warning{% endif %}"></div>
+                            <div class="timeline-content">
+                                <h6>{{ log.action|title }}</h6>
+                                <p class="text-muted small">{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+                                <p>{{ log.description }}</p>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="d-flex gap-2">
+                {% if session.status == 'draft' or session.status == 'in_progress' %}
+                <button class="btn btn-success" id="submitQCBtn">
+                    <i data-feather="check-circle"></i> Submit QC Approval
+                </button>
+                {% endif %}
+                
+                {% if session.status == 'completed' %}
+                <button class="btn btn-primary" id="postTransferBtn">
+                    <i data-feather="send"></i> Post to SAP B1
+                </button>
+                {% endif %}
+                
+                {% if session.status == 'transferred' %}
+                <button class="btn btn-info" id="printLabelsBtn">
+                    <i data-feather="printer"></i> Print Labels
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Item Edit Modal -->
+<div class="modal fade" id="itemEditModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="itemEditContent">
+                <!-- Content loaded dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="saveItemBtn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.timeline {
+    position: relative;
+    padding: 20px 0;
+}
+
+.timeline-item {
+    display: flex;
+    margin-bottom: 20px;
+}
+
+.timeline-marker {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    margin-right: 20px;
+    margin-top: 5px;
+    flex-shrink: 0;
+}
+
+.timeline-content {
+    flex: 1;
+}
+</style>
+
+<script>
+const sessionId = {{ session.id }};
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadQCItems();
+    loadLabels();
+    loadWarehouses();
+    
+    // Event listeners for buttons
+    const submitQCBtn = document.getElementById('submitQCBtn');
+    const postTransferBtn = document.getElementById('postTransferBtn');
+    const generateLabelsBtn = document.getElementById('generateLabelsBtn');
+    const printLabelsBtn = document.getElementById('printLabelsBtn');
+    
+    if (submitQCBtn) submitQCBtn.addEventListener('click', submitQCApproval);
+    if (postTransferBtn) postTransferBtn.addEventListener('click', postTransfer);
+    if (generateLabelsBtn) generateLabelsBtn.addEventListener('click', generateLabels);
+    if (printLabelsBtn) printLabelsBtn.addEventListener('click', printLabels);
+});
+
+function loadWarehouses() {
+    // Load warehouses for all warehouse dropdowns
+    fetch(`/grpo-transfer/api/warehouses`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.warehouses) {
+                const warehouses = data.warehouses;
+                
+                // Update all warehouse dropdowns
+                {% for item in session.items %}
+                const warehouseSelect = document.querySelector('select[name="to_warehouse_{{ item.id }}"]');
+                if (warehouseSelect) {
+                    warehouses.forEach(warehouse => {
+                        const option = document.createElement('option');
+                        option.value = warehouse.WarehouseCode;
+                        option.textContent = `${warehouse.WarehouseCode} - ${warehouse.WarehouseName}`;
+                        warehouseSelect.appendChild(option);
+                    });
+                    
+                    // Add change listener for bin codes
+                    warehouseSelect.addEventListener('change', function() {
+                        loadBinCodes(this.value, 'to_bin_{{ item.id }}');
+                    });
+                }
+                {% endfor %}
+            }
+        })
+        .catch(error => console.error('Error loading warehouses:', error));
+}
+
+function loadBinCodes(warehouseCode, binSelectName) {
+    if (!warehouseCode) return;
+    
+    fetch(`/grpo-transfer/api/bin-codes/${warehouseCode}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.bins) {
+                const binSelect = document.querySelector(`select[name="${binSelectName}"]`);
+                if (binSelect) {
+                    // Clear existing options except first
+                    while (binSelect.options.length > 1) {
+                        binSelect.remove(1);
+                    }
+                    
+                    // Add bin options
+                    data.bins.forEach(bin => {
+                        const option = document.createElement('option');
+                        option.value = bin.BinCode;
+                        option.textContent = bin.BinCode;
+                        binSelect.appendChild(option);
+                    });
+                }
+            }
+        })
+        .catch(error => console.error('Error loading bin codes:', error));
+}
+
+function loadQCItems() {
+    const container = document.getElementById('qcItemsContainer');
+    container.innerHTML = '';
+    
+    {% for item in session.items %}
+    const itemCard = document.createElement('div');
+    itemCard.className = 'card mb-3';
+    itemCard.innerHTML = `
+        <div class="card-header">
+            <h6 class="mb-0">{{ item.item_code }} - {{ item.item_name }}</h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label">Received Qty</label>
+                    <input type="text" class="form-control" value="{{ item.received_quantity }}" disabled>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Approved Qty</label>
+                    <input type="number" class="form-control" name="approved_qty_{{ item.id }}" value="{{ item.approved_quantity }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Rejected Qty</label>
+                    <input type="number" class="form-control" name="rejected_qty_{{ item.id }}" value="{{ item.rejected_quantity }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" name="status_{{ item.id }}">
+                        <option value="pending" {% if item.qc_status == 'pending' %}selected{% endif %}>Pending</option>
+                        <option value="approved" {% if item.qc_status == 'approved' %}selected{% endif %}>Approved</option>
+                        <option value="rejected" {% if item.qc_status == 'rejected' %}selected{% endif %}>Rejected</option>
+                        <option value="partial" {% if item.qc_status == 'partial' %}selected{% endif %}>Partial</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <label class="form-label">To Warehouse</label>
+                    <select class="form-select" name="to_warehouse_{{ item.id }}">
+                        <option value="">-- Select Warehouse --</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">To Bin Code</label>
+                    <select class="form-select" name="to_bin_{{ item.id }}">
+                        <option value="">-- Select Bin --</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    <label class="form-label">QC Notes</label>
+                    <textarea class="form-control" name="notes_{{ item.id }}" rows="2"></textarea>
+                </div>
+            </div>
+        </div>
+    `;
+    container.appendChild(itemCard);
+    {% endfor %}
+}
+
+function loadLabels() {
+    const container = document.getElementById('labelsContainer');
+    
+    // Check if there are any approved items
+    const approvedItems = {{ items_json|tojson }}.filter(item => item.qc_status === 'approved');
+    
+    if (approvedItems.length === 0) {
+        container.innerHTML = '<p class="text-muted">No approved items. Submit QC approval first.</p>';
+        return;
+    }
+    
+    // Display message if no labels generated yet
+    container.innerHTML = '<p class="text-muted">Click "Generate Labels" button to create QR labels for approved items.</p>';
+}
+
+function submitQCApproval() {
+    const items = [];
+    
+    // Collect form data from all item cards
+    {% for item in session.items %}
+    const approvedQty = parseFloat(document.querySelector('input[name="approved_qty_{{ item.id }}"]').value) || 0;
+    const rejectedQty = parseFloat(document.querySelector('input[name="rejected_qty_{{ item.id }}"]').value) || 0;
+    const status = document.querySelector('select[name="status_{{ item.id }}"]').value;
+    const toWarehouse = document.querySelector('select[name="to_warehouse_{{ item.id }}"]').value;
+    const toBin = document.querySelector('select[name="to_bin_{{ item.id }}"]').value;
+    const notes = document.querySelector('textarea[name="notes_{{ item.id }}"]').value;
+    
+    items.push({
+        item_id: {{ item.id }},
+        approved_quantity: approvedQty,
+        rejected_quantity: rejectedQty,
+        qc_status: status,
+        to_warehouse: toWarehouse,
+        to_bin_code: toBin,
+        qc_notes: notes
+    });
+    {% endfor %}
+    
+    // Validate that at least one item is approved
+    const hasApproved = items.some(item => item.qc_status === 'approved' && item.approved_quantity > 0);
+    if (!hasApproved) {
+        alert('Please approve at least one item');
+        return;
+    }
+    
+    fetch(`/grpo-transfer/api/session/${sessionId}/qc-approve`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({items: items})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('QC approval submitted successfully');
+            location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error submitting QC approval');
+    });
+}
+
+function postTransfer() {
+    if (confirm('Post this transfer to SAP B1?')) {
+        fetch(`/grpo-transfer/api/session/${sessionId}/post-transfer`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(`Transfer posted successfully. SAP DocNum: ${data.sap_doc_num}`);
+                location.reload();
+            } else {
+                alert('Error: ' + (data.error || 'Failed to post transfer'));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error posting transfer to SAP B1');
+        });
+    }
+}
+
+function generateLabels() {
+    // Check if there are approved items first
+    const approvedItems = {{ items_json|tojson }}.filter(item => item.qc_status === 'approved');
+    
+    if (approvedItems.length === 0) {
+        alert('No approved items found. Please submit QC approval first.');
+        return;
+    }
+    
+    if (!confirm(`Generate QR labels for ${approvedItems.length} approved item(s)?`)) {
+        return;
+    }
+    
+    // Show loading indicator
+    const btn = document.getElementById('generateLabelsBtn');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generating...';
+    
+    fetch(`/grpo-transfer/api/session/${sessionId}/generate-qr-labels`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'}
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        
+        if (data.success) {
+            alert(`✓ ${data.labels_generated} QR labels generated successfully!`);
+            // Reload page to show generated labels
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            alert('Error: ' + (data.error || 'Failed to generate labels'));
+            console.error('API Error:', data);
+        }
+    })
+    .catch(error => {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        console.error('Error:', error);
+        alert('Error generating labels: ' + error.message);
+    });
+}
+
+function printLabels() {
+    window.print();
+}
+
+function editItem(itemId) {
+    // Get item data from the table row
+    const row = document.querySelector(`button[onclick="editItem(${itemId})"]`).closest('tr');
+    
+    if (!row) {
+        alert('Item row not found');
+        return;
+    }
+    
+    // Extract data from table cells
+    const cells = row.querySelectorAll('td');
+    const itemCode = cells[0].textContent.trim();
+    const itemName = cells[1].textContent.trim();
+    const receivedQty = parseFloat(cells[3].textContent.trim());
+    const approvedQty = parseFloat(cells[4].textContent.trim());
+    const rejectedQty = parseFloat(cells[5].textContent.trim());
+    
+    const content = `
+        <form id="itemEditForm">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Item Code</label>
+                    <input type="text" class="form-control" value="${itemCode}" disabled>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Item Name</label>
+                    <input type="text" class="form-control" value="${itemName}" disabled>
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <label class="form-label">Received Qty</label>
+                    <input type="number" class="form-control" value="${receivedQty}" disabled>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Approved Qty</label>
+                    <input type="number" class="form-control" id="editApprovedQty" value="${approvedQty}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Rejected Qty</label>
+                    <input type="number" class="form-control" id="editRejectedQty" value="${rejectedQty}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="editStatus">
+                        <option value="pending">Pending</option>
+                        <option value="approved">Approved</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="partial">Partial</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">To Warehouse</label>
+                    <input type="text" class="form-control" id="editWarehouse" placeholder="Select warehouse">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">To Bin Code</label>
+                    <input type="text" class="form-control" id="editBin" placeholder="Select bin">
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">QC Notes</label>
+                <textarea class="form-control" id="editNotes" rows="3"></textarea>
+            </div>
+        </form>
+    `;
+    
+    document.getElementById('itemEditContent').innerHTML = content;
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('itemEditModal'));
+    modal.show();
+}
+</script>
+{% endblock %}

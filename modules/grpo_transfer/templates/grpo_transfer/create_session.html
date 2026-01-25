@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Create Transfer Session{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2><i data-feather="plus-circle"></i> Create Transfer Session</h2>
+            <p class="text-muted">GRPO Document: {{ doc_details.DocNum }}</p>
+        </div>
+    </div>
+
+    <!-- Document Summary -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h6 class="mb-0">Document Details</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <p class="text-muted small">Document Number</p>
+                            <p><strong>{{ doc_details.DocNum }}</strong></p>
+                        </div>
+                        <div class="col-6">
+                            <p class="text-muted small">Vendor</p>
+                            <p><strong>{{ doc_details.CardName }}</strong></p>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-6">
+                            <p class="text-muted small">Document Date</p>
+                            <p><strong>{{ doc_details.DocDate }}</strong></p>
+                        </div>
+                        <div class="col-6">
+                            <p class="text-muted small">Total Amount</p>
+                            <p><strong>{{ "%.2f"|format(doc_details.DocTotal) }}</strong></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">Line Items Summary</h6>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small">Total Items</p>
+                    <h3>{{ line_items|length }}</h3>
+                    <hr>
+                    <p class="text-muted small">Total Quantity</p>
+                    <h3>{{ line_items|map(attribute='Quantity')|sum }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Line Items -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">Line Items to Transfer</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Line #</th>
+                                    <th>Item Code</th>
+                                    <th>Description</th>
+                                    <th>Quantity</th>
+                                    <th>Warehouse</th>
+                                    <th>Unit Price</th>
+                                    <th>Line Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in line_items %}
+                                <tr>
+                                    <td>{{ item.LineNum }}</td>
+                                    <td><strong>{{ item.ItemCode }}</strong></td>
+                                    <td>{{ item.ItemDescription }}</td>
+                                    <td>{{ item.Quantity }}</td>
+                                    <td>{{ item.WarehouseCode }}</td>
+                                    <td>{{ "%.2f"|format(item.Price) }}</td>
+                                    <td>{{ "%.2f"|format(item.LineTotal) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Session Form -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h6 class="mb-0">Create Transfer Session</h6>
+                </div>
+                <div class="card-body">
+                    <form id="createSessionForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Session Code (Auto-generated)</label>
+                                    <input type="text" class="form-control" id="sessionCode" disabled>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Created By</label>
+                                    <input type="text" class="form-control" value="{{ current_user.first_name }} {{ current_user.last_name }}" disabled>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Session Description (Optional)</label>
+                                    <textarea class="form-control" id="description" rows="3" placeholder="Add any notes about this transfer session..."></textarea>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Priority</label>
+                                    <select class="form-select" id="priority">
+                                        <option value="normal">Normal</option>
+                                        <option value="high">High</option>
+                                        <option value="urgent">Urgent</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i data-feather="info"></i>
+                            <strong>Note:</strong> After creating the session, you will be able to add items, validate them, and proceed with QC approval.
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i data-feather="check-circle"></i> Create Session
+                            </button>
+                            <a href="{{ url_for('grpo_transfer.index') }}" class="btn btn-secondary btn-lg">
+                                <i data-feather="arrow-left"></i> Back
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const docEntry = {{ doc_details.DocEntry }};
+const docNum = '{{ doc_details.DocNum }}';
+const vendorCode = '{{ doc_details.CardCode }}';
+const vendorName = '{{ doc_details.CardName }}';
+const docDate = '{{ doc_details.DocDate }}';
+const docTotal = {{ doc_details.DocTotal }};
+const seriesId = {{ doc_details.Series }};
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Generate session code
+    const timestamp = new Date().toISOString().replace(/[:-]/g, '').split('.')[0];
+    document.getElementById('sessionCode').value = `GRPO-${docEntry}-${timestamp}`;
+    
+    // Form submission
+    document.getElementById('createSessionForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        createSession();
+    });
+});
+
+function createSession() {
+    const sessionCode = document.getElementById('sessionCode').value;
+    
+    fetch('/grpo-transfer/api/create-session', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            grpo_doc_entry: docEntry,
+            grpo_doc_num: docNum,
+            series_id: seriesId,
+            vendor_code: vendorCode,
+            vendor_name: vendorName,
+            doc_date: docDate,
+            doc_total: docTotal
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Session created successfully');
+            window.location.href = `/grpo-transfer/session/${data.session_id}`;
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error creating session');
+    });
+}
+</script>
+{% endblock %}

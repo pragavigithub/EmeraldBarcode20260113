@@ -1,0 +1,417 @@
+{% extends "base.html" %}
+
+{% block title %}QC Validation - {{ session.session_code }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2><i data-feather="check-circle"></i> QC Validation & Approval</h2>
+            <p class="text-muted">Session: {{ session.session_code }}</p>
+        </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="progress" style="height: 25px;">
+                        <div class="progress-bar bg-success" role="progressbar" id="progressBar" style="width: 0%">
+                            <span id="progressText">0%</span>
+                        </div>
+                    </div>
+                    <small class="text-muted mt-2 d-block">Items Validated: <span id="validatedCount">0</span> / {{ session.items|length }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QC Items -->
+    <form id="qcValidationForm">
+        {% for item in session.items %}
+        <div class="card mb-4 qc-item-card" data-item-id="{{ item.id }}">
+            <div class="card-header bg-light">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <h6 class="mb-0">
+                            <i data-feather="package"></i> {{ item.item_code }}
+                            {% if item.is_batch_item %}
+                                <span class="badge bg-primary">Batch Item</span>
+                            {% elif item.is_serial_item %}
+                                <span class="badge bg-success">Serial Item</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Non-Managed</span>
+                            {% endif %}
+                        </h6>
+                        <small class="text-muted">{{ item.item_name }}</small>
+                    </div>
+                    <div class="col-auto">
+                        <span class="badge bg-info">Received: {{ item.received_quantity }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-body">
+                <!-- Item Details -->
+                <div class="row mb-4">
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">Received Quantity</label>
+                            <input type="text" class="form-control" value="{{ item.received_quantity }}" disabled>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">Approved Quantity <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control approved-qty" name="approved_qty_{{ item.id }}" 
+                                   value="{{ item.approved_quantity }}" min="0" max="{{ item.received_quantity }}" required>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">Rejected Quantity</label>
+                            <input type="number" class="form-control rejected-qty" name="rejected_qty_{{ item.id }}" 
+                                   value="{{ item.rejected_quantity }}" min="0" max="{{ item.received_quantity }}" disabled>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label class="form-label">QC Status <span class="text-danger">*</span></label>
+                            <select class="form-select qc-status" name="status_{{ item.id }}" required>
+                                <option value="">-- Select Status --</option>
+                                <option value="approved" {% if item.qc_status == 'approved' %}selected{% endif %}>Approved</option>
+                                <option value="rejected" {% if item.qc_status == 'rejected' %}selected{% endif %}>Rejected</option>
+                                <option value="partial" {% if item.qc_status == 'partial' %}selected{% endif %}>Partial</option>
+                                <option value="hold" {% if item.qc_status == 'hold' %}selected{% endif %}>Hold</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Batch Information (if batch item) -->
+                {% if item.is_batch_item and item.batches %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h6 class="mb-3">Batch Information</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Batch Number</th>
+                                        <th>Quantity</th>
+                                        <th>Expiry Date</th>
+                                        <th>Approved Qty</th>
+                                        <th>Rejected Qty</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for batch in item.batches %}
+                                    <tr>
+                                        <td><strong>{{ batch.batch_number }}</strong></td>
+                                        <td>{{ batch.batch_quantity }}</td>
+                                        <td>{{ batch.expiry_date.strftime('%Y-%m-%d') if batch.expiry_date else 'N/A' }}</td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm" 
+                                                   name="batch_approved_{{ batch.id }}" value="{{ batch.approved_quantity }}" min="0">
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm" 
+                                                   name="batch_rejected_{{ batch.id }}" value="{{ batch.rejected_quantity }}" min="0">
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Warehouse Selection -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">From Warehouse</label>
+                            <input type="text" class="form-control" value="{{ item.from_warehouse }}" disabled>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">To Warehouse <span class="text-danger">*</span></label>
+                            <select class="form-select to-warehouse" name="to_warehouse_{{ item.id }}" required>
+                                <option value="">-- Select Warehouse --</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bin Selection -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">From Bin Code</label>
+                            <input type="text" class="form-control" value="{{ item.from_bin_code or 'N/A' }}" disabled>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">To Bin Code <span class="text-danger">*</span></label>
+                            <select class="form-select to-bin" name="to_bin_{{ item.id }}" required>
+                                <option value="">-- Select Bin --</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- QC Notes -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="mb-3">
+                            <label class="form-label">QC Notes</label>
+                            <textarea class="form-control qc-notes" name="notes_{{ item.id }}" rows="3" 
+                                      placeholder="Enter any QC observations or issues..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quantity Splits (if partial) -->
+                <div class="row mb-4 splits-section" style="display: none;">
+                    <div class="col-12">
+                        <h6 class="mb-3">Quantity Splits</h6>
+                        <div id="splits_{{ item.id }}" class="splits-container"></div>
+                        <button type="button" class="btn btn-sm btn-outline-primary add-split-btn" data-item-id="{{ item.id }}">
+                            <i data-feather="plus"></i> Add Split
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Action Buttons -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i data-feather="check-circle"></i> Submit QC Approval
+                    </button>
+                    <button type="reset" class="btn btn-secondary btn-lg">
+                        <i data-feather="refresh-cw"></i> Reset Form
+                    </button>
+                    <a href="{{ url_for('grpo_transfer.session_detail', session_id=session.id) }}" class="btn btn-outline-secondary btn-lg">
+                        <i data-feather="arrow-left"></i> Back to Session
+                    </a>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<style>
+.qc-item-card {
+    border-left: 4px solid #007bff;
+}
+
+.qc-item-card.approved {
+    border-left-color: #28a745;
+}
+
+.qc-item-card.rejected {
+    border-left-color: #dc3545;
+}
+
+.qc-item-card.partial {
+    border-left-color: #ffc107;
+}
+
+.split-item {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 10px;
+}
+</style>
+
+<script>
+const sessionId = {{ session.id }};
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadWarehouses();
+    setupEventListeners();
+});
+
+function loadWarehouses() {
+    fetch('/grpo-transfer/api/warehouses')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                document.querySelectorAll('.to-warehouse').forEach(select => {
+                    data.warehouses.forEach(warehouse => {
+                        const option = document.createElement('option');
+                        option.value = warehouse.WarehouseCode;
+                        option.textContent = warehouse.WarehouseName;
+                        select.appendChild(option);
+                    });
+                    
+                    select.addEventListener('change', function() {
+                        loadBinCodes(this.value, this.closest('.qc-item-card').querySelector('.to-bin'));
+                    });
+                });
+            }
+        });
+}
+
+function loadBinCodes(warehouseCode, binSelect) {
+    fetch(`/grpo-transfer/api/bin-codes/${warehouseCode}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                binSelect.innerHTML = '<option value="">-- Select Bin --</option>';
+                data.bins.forEach(bin => {
+                    const option = document.createElement('option');
+                    option.value = bin.BinCode;
+                    option.textContent = bin.BinCode;
+                    binSelect.appendChild(option);
+                });
+            }
+        });
+}
+
+function setupEventListeners() {
+    // QC Status change
+    document.querySelectorAll('.qc-status').forEach(select => {
+        select.addEventListener('change', function() {
+            const card = this.closest('.qc-item-card');
+            const approvedQty = card.querySelector('.approved-qty');
+            const rejectedQty = card.querySelector('.rejected-qty');
+            const splitsSection = card.querySelector('.splits-section');
+            
+            if (this.value === 'partial') {
+                splitsSection.style.display = 'block';
+                rejectedQty.disabled = false;
+            } else {
+                splitsSection.style.display = 'none';
+                rejectedQty.disabled = true;
+                rejectedQty.value = 0;
+            }
+            
+            // Update card styling
+            card.classList.remove('approved', 'rejected', 'partial');
+            if (this.value === 'approved') card.classList.add('approved');
+            else if (this.value === 'rejected') card.classList.add('rejected');
+            else if (this.value === 'partial') card.classList.add('partial');
+        });
+    });
+    
+    // Approved quantity change
+    document.querySelectorAll('.approved-qty').forEach(input => {
+        input.addEventListener('change', function() {
+            const card = this.closest('.qc-item-card');
+            const received = parseFloat(card.querySelector('input[disabled]').value);
+            const approved = parseFloat(this.value) || 0;
+            const rejected = card.querySelector('.rejected-qty');
+            
+            rejected.value = Math.max(0, received - approved);
+        });
+    });
+    
+    // Add split button
+    document.querySelectorAll('.add-split-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            addSplit(this.dataset.itemId);
+        });
+    });
+    
+    // Form submission
+    document.getElementById('qcValidationForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        submitQCApproval();
+    });
+}
+
+function addSplit(itemId) {
+    const container = document.getElementById(`splits_${itemId}`);
+    const splitNum = container.children.length + 1;
+    
+    const splitDiv = document.createElement('div');
+    splitDiv.className = 'split-item';
+    splitDiv.innerHTML = `
+        <div class="row">
+            <div class="col-md-3">
+                <label class="form-label">Split #${splitNum} Quantity</label>
+                <input type="number" class="form-control" name="split_qty_${itemId}_${splitNum}" min="0">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Status</label>
+                <select class="form-select" name="split_status_${itemId}_${splitNum}">
+                    <option value="OK">OK</option>
+                    <option value="NOTOK">NOTOK</option>
+                    <option value="HOLD">HOLD</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">To Warehouse</label>
+                <select class="form-select" name="split_warehouse_${itemId}_${splitNum}">
+                    <option value="">-- Select --</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <button type="button" class="btn btn-sm btn-danger w-100" onclick="this.parentElement.parentElement.parentElement.remove()">
+                    <i data-feather="trash-2"></i> Remove
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(splitDiv);
+}
+
+function submitQCApproval() {
+    const formData = new FormData(document.getElementById('qcValidationForm'));
+    const items = [];
+    
+    document.querySelectorAll('.qc-item-card').forEach(card => {
+        const itemId = card.dataset.itemId;
+        const approvedQty = parseFloat(card.querySelector('.approved-qty').value) || 0;
+        const rejectedQty = parseFloat(card.querySelector('.rejected-qty').value) || 0;
+        const status = card.querySelector('.qc-status').value;
+        const toWarehouse = card.querySelector('.to-warehouse').value;
+        const toBin = card.querySelector('.to-bin').value;
+        const notes = card.querySelector('.qc-notes').value;
+        
+        items.push({
+            item_id: itemId,
+            approved_quantity: approvedQty,
+            rejected_quantity: rejectedQty,
+            qc_status: status,
+            to_warehouse: toWarehouse,
+            to_bin_code: toBin,
+            qc_notes: notes
+        });
+    });
+    
+    fetch(`/grpo-transfer/api/session/${sessionId}/qc-approve`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({items: items})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('QC approval submitted successfully');
+            window.location.href = `/grpo-transfer/session/${sessionId}`;
+        } else {
+            alert('Error: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error submitting QC approval');
+    });
+}
+</script>
+{% endblock %}
