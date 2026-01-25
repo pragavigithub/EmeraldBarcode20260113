@@ -43,6 +43,14 @@ The system is built on a Flask web application backend, utilizing Jinja2 for ser
 *   **SO Against Invoice Module:** Allows creating invoices against existing Sales Orders with SAP B1 integration, including SO series selection, SO number validation, and item validation.
 *   **Item Tracking Module:** Serial number tracking module that fetches transaction history from SAP B1 using the 'item_tracking' SQL Query. Supports manual entry and QR code scanning, displays document type names (GRPO, Delivery, Invoice, Transfer, etc.) with complete SAP B1 DocType mapping.
 
+## Recent Changes (January 25, 2026)
+*   **GRPO Transfer Module API Enhancement:** Added missing API endpoints and fixed Edit/Save functionality:
+    - Added GET `/grpo-transfer/api/item/<id>` endpoint to fetch single item details with batch info
+    - Added PUT `/grpo-transfer/api/item/<id>` endpoint to update item quantities, status, and warehouse/bin assignments
+    - Fixed Edit Item modal to load data from API and save changes properly
+    - Enhanced modal form with warehouse/bin dropdown selection and batch information display
+    - Updated MySQL migration file with 6 GRPO Transfer tables (sessions, items, batches, splits, logs, qr_labels)
+
 ## Recent Changes (December 15, 2025)
 *   **Inventory Transfer Multi-Batch Support Enhancement:** Enhanced the duplicate prevention logic to support transferring the same item code with different batch numbers:
     - Previously: Same item code was blocked regardless of batch number
