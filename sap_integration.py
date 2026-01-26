@@ -483,6 +483,82 @@ class SAPIntegration:
             )
         return []
 
+    def get_grpo_series(self):
+        """Get GRPO series from SAP B1 using SQLQuery"""
+        if not self.ensure_logged_in():
+            return []
+        try:
+            url = f"{self.base_url}/b1s/v1/SQLQueries('GET_GRPO_Series')/List"
+            response = self.session.post(url, timeout=30)
+            if response.status_code == 200:
+                return response.json().get('value', [])
+            return []
+        except Exception as e:
+            logging.error(f"Error fetching GRPO series: {str(e)}")
+            return []
+
+    def get_grpo_docnums_by_series(self, series_id):
+        """Get open GRPO doc numbers by series using SQLQuery"""
+        if not self.ensure_logged_in():
+            return []
+        try:
+            url = f"{self.base_url}/b1s/v1/SQLQueries('GET_GRPO_DocEntry_By_Series')/List"
+            payload = {"ParamList": f"seriesID='{series_id}'"}
+            headers = {"Prefer": "odata.maxpagesize=0"}
+            response = self.session.post(url, json=payload, headers=headers, timeout=30)
+            if response.status_code == 200:
+                return response.json().get('value', [])
+            return []
+        except Exception as e:
+            logging.error(f"Error fetching GRPO docnums: {str(e)}")
+            return []
+
+    def get_grpo_details(self, doc_entry):
+        """Get GRPO details using crossjoin for document and lines"""
+        if not self.ensure_logged_in():
+            return None
+        try:
+            # Using the complex crossjoin URL provided in the instructions
+            url = f"{self.base_url}/b1s/v1/$crossjoin(PurchaseDeliveryNotes,PurchaseDeliveryNotes/DocumentLines)?$expand=PurchaseDeliveryNotes($select=CardCode,CardName,DocumentStatus,DocNum,Series,DocDate,DocDueDate,DocTotal,DocEntry),PurchaseDeliveryNotes/DocumentLines($select=LineNum,ItemCode,ItemDescription,WarehouseCode,UnitsOfMeasurment,DocEntry,LineTotal,LineStatus,Quantity,Price,PriceAfterVAT)&$filter=PurchaseDeliveryNotes/DocEntry eq PurchaseDeliveryNotes/DocumentLines/DocEntry and PurchaseDeliveryNotes/DocEntry eq {doc_entry}"
+            headers = {"Prefer": "odata.maxpagesize=0"}
+            response = self.session.get(url, headers=headers, timeout=30)
+            if response.status_code == 200:
+                return response.json().get('value', [])
+            return None
+        except Exception as e:
+            logging.error(f"Error fetching GRPO details: {str(e)}")
+            return None
+
+    def get_batches_by_doc_entry(self, doc_entry):
+        """Get batch numbers for a GRPO by DocEntry using SQLQuery"""
+        if not self.ensure_logged_in():
+            return []
+        try:
+            url = f"{self.base_url}/b1s/v1/SQLQueries('Get_Batches_By_DocEntry')/List"
+            payload = {"ParamList": f"docEntry='{doc_entry}'"}
+            response = self.session.post(url, json=payload, timeout=30)
+            if response.status_code == 200:
+                return response.json().get('value', [])
+            return []
+        except Exception as e:
+            logging.error(f"Error fetching batches by docEntry: {str(e)}")
+            return []
+
+    def create_stock_transfer(self, transfer_data):
+        """Create a stock transfer in SAP B1"""
+        if not self.ensure_logged_in():
+            return {'success': False, 'error': 'Not logged in to SAP'}
+        try:
+            url = f"{self.base_url}/b1s/v1/StockTransfers"
+            response = self.session.post(url, json=transfer_data, timeout=30)
+            if response.status_code in [201, 200]:
+                return {'success': True, 'data': response.json()}
+            else:
+                return {'success': False, 'error': response.text}
+        except Exception as e:
+            logging.error(f"Error creating stock transfer: {str(e)}")
+            return {'success': False, 'error': str(e)}
+
     def get_serial_current_location(self, serial_number):
         """Get current location of a serial number from SAP B1 using SQL Query with fallback"""
         if not self.ensure_logged_in():

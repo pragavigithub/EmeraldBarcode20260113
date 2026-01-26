@@ -9,6 +9,66 @@ import logging
 def register_api_routes(app):
     """Register API routes with the Flask app"""
     
+    @app.route('/api/get-grpo-series', methods=['GET'])
+    def get_grpo_series():
+        """Get GRPO series for Transfer QC"""
+        try:
+            sap = SAPIntegration()
+            series = sap.get_grpo_series()
+            return jsonify({'success': True, 'series': series})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+
+    @app.route('/api/get-grpo-docnums', methods=['GET'])
+    def get_grpo_docnums():
+        """Get open GRPO document numbers for a series"""
+        try:
+            series_id = request.args.get('seriesID')
+            if not series_id:
+                return jsonify({'success': False, 'error': 'seriesID is required'}), 400
+            sap = SAPIntegration()
+            documents = sap.get_grpo_docnums_by_series(series_id)
+            return jsonify({'success': True, 'documents': documents})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+
+    @app.route('/api/get-grpo-details', methods=['GET'])
+    def get_grpo_details():
+        """Get detailed GRPO document with lines"""
+        try:
+            doc_entry = request.args.get('docEntry')
+            if not doc_entry:
+                return jsonify({'success': False, 'error': 'docEntry is required'}), 400
+            sap = SAPIntegration()
+            details = sap.get_grpo_details(doc_entry)
+            return jsonify({'success': True, 'value': details})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+
+    @app.route('/api/get-batches-by-docentry', methods=['GET'])
+    def get_batches_by_docentry():
+        """Get batch details for a GRPO docEntry"""
+        try:
+            doc_entry = request.args.get('docEntry')
+            if not doc_entry:
+                return jsonify({'success': False, 'error': 'docEntry is required'}), 400
+            sap = SAPIntegration()
+            batches = sap.get_batches_by_doc_entry(doc_entry)
+            return jsonify({'success': True, 'value': batches})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+
+    @app.route('/api/post-transfer-qc', methods=['POST'])
+    def post_transfer_qc():
+        """Post the QC approved stock transfer"""
+        try:
+            data = request.get_json()
+            sap = SAPIntegration()
+            result = sap.create_stock_transfer(data)
+            return jsonify(result)
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)})
+
     @app.route('/api/get-warehouses', methods=['GET'])
     def get_warehouses():
         """Get all warehouses for dropdown selection"""

@@ -120,6 +120,12 @@ def get_invt_docnums():
 
 # Note: get_invt_details route moved to api_routes.py to avoid conflicts
 
+@app.route('/transfer-qc')
+@login_required
+def transfer_qc():
+    """Render Transfer Quality Check Module"""
+    return render_template('transfer_qc.html')
+
 @app.route('/api/get-invcnt-series', methods=['GET'])
 def get_invcnt_series():
     """Get Inventory Counting document series for dropdown selection"""

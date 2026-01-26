@@ -1,0 +1,565 @@
+Create New Module Name: Transfer Quality Check Module
+
+Step 1: Get the SeriesID as DropDown List Using This URL:
+https://192.168.1.4:50000/b1s/v1/SQLQueries('GET_GRPO_Series')/List
+Method:POST
+Response:
+{
+    "odata.metadata": "https://192.168.1.4:50000/b1s/v1/$metadata#SAPB1.SQLQueryResult",
+    "SqlText": "SELECT DISTINCT T1.[Series] AS [SeriesID],T1.[SeriesName] FROM [OPDN] T0 INNER JOIN [NNM1] T1 ON T0.[Series] = T1.[Series]",
+    "value": [
+        {
+            "SeriesID": 17,
+            "SeriesName": "Primary"
+        },
+        {
+            "SeriesID": 181,
+            "SeriesName": "GRN 2324"
+        },
+        {
+            "SeriesID": 241,
+            "SeriesName": "GRN 2526"
+        }
+    ]
+}
+
+Step 2: Get the DocNum Make this to DropDown List using above Choosed SeriesID Using below URL:
+https://192.168.1.4:50000/b1s/v1/SQLQueries('GET_GRPO_DocEntry_By_Series')/List
+Method:POST
+headers = {"Prefer": "odata.maxpagesize=0"}
+
+Body:
+{
+    "ParamList": "seriesID='241'"
+}
+Response:
+{
+    "odata.metadata": "https://192.168.1.4:50000/b1s/v1/$metadata#SAPB1.SQLQueryResult",
+    "SqlText": "SELECT DISTINCT T1.[DocNum],T1.[CardName],T1.[DocStatus],T1.[DocEntry] FROM [OPDN] T1 WHERE T1.[DocStatus] = 'O' AND T1.[Series] =:seriesID",
+    "value": [
+        {
+            "CardName": "4S Cargo Services",
+            "DocEntry": 7736,
+            "DocNum": 123450000,
+            "DocStatus": "O"
+     },
+    {
+            "CardName": "3D SEALS PRIVATE LIMITED",
+            "DocEntry": 7817,
+            "DocNum": 123450079,
+            "DocStatus": "O"
+        },
+        {
+            "CardName": "3D SEALS PRIVATE LIMITED",
+            "DocEntry": 7818,
+            "DocNum": 123450080,
+            "DocStatus": "O"
+        },
+        {
+            "CardName": "3D SEALS PRIVATE LIMITED",
+            "DocEntry": 7819,
+            "DocNum": 123450081,
+            "DocStatus": "O"
+        },
+        {
+            "CardName": "3D SEALS PRIVATE LIMITED",
+            "DocEntry": 7820,
+            "DocNum": 123450082,
+            "DocStatus": "O"
+        },
+        {
+            "CardName": "3D SEALS PRIVATE LIMITED",
+            "DocEntry": 7824,
+            "DocNum": 123450086,
+            "DocStatus": "O"
+        },
+        {
+            "CardName": "3D SEALS PRIVATE LIMITED",
+            "DocEntry": 7825,
+            "DocNum": 123450087,
+            "DocStatus": "O"
+        },
+        {
+            "CardName": "3D SEALS PRIVATE LIMITED",
+            "DocEntry": 7826,
+            "DocNum": 123450088,
+            "DocStatus": "O"
+        },
+        
+       {
+            "CardName": "3D SEALS PRIVATE LIMITED",
+            "DocEntry": 7831,
+            "DocNum": 123450093,
+            "DocStatus": "O"
+        },
+        {
+            "CardName": "3D SEALS PRIVATE LIMITED",
+            "DocEntry": 7832,
+            "DocNum": 123450094,
+            "DocStatus": "O"
+        },
+        {
+            "CardName": "3D SEALS PRIVATE LIMITED",
+            "DocEntry": 7833,
+            "DocNum": 123450095,
+            "DocStatus": "O"
+        },
+        
+        
+        {
+            "CardName": "3D SEALS PRIVATE LIMITED",
+            "DocEntry": 7841,
+            "DocNum": 123450103,
+            "DocStatus": "O"
+        },
+        {
+            "CardName": "3D SEALS PRIVATE LIMITED",
+            "DocEntry": 7842,
+            "DocNum": 123450104,
+            "DocStatus": "O"
+        }
+    ]
+}
+Step 3:Get the GRPO Document Using Choosed DocEntry Using Below URL:
+
+https://192.168.1.4:50000/b1s/v1/$crossjoin(PurchaseDeliveryNotes,PurchaseDeliveryNotes/DocumentLines)?$expand=PurchaseDeliveryNotes($select=CardCode,CardName,DocumentStatus,DocNum,Series,DocDate,DocDueDate,DocTotal,DocEntry),PurchaseDeliveryNotes/DocumentLines($select=LineNum,ItemCode,ItemDescription,WarehouseCode,UnitsOfMeasurment,DocEntry,LineTotal,LineStatus,Quantity,Price,PriceAfterVAT)&$filter=PurchaseDeliveryNotes/DocumentStatus eq PurchaseDeliveryNotes/DocumentLines/LineStatus and PurchaseDeliveryNotes/DocEntry eq PurchaseDeliveryNotes/DocumentLines/DocEntry and PurchaseDeliveryNotes/DocumentLines/DocEntry eq 7840 
+
+Method :GET
+headers = {"Prefer": "odata.maxpagesize=0"}
+
+Response:
+{
+    "odata.metadata": "$metadata#Collection(Edm.ComplexType)",
+    "value": [
+        {
+            "PurchaseDeliveryNotes": {
+                "CardCode": "3D SPL",
+                "CardName": "3D SEALS PRIVATE LIMITED",
+                "DocumentStatus": "O",
+                "DocNum": 123450102,
+                "Series": 241,
+                "DocDate": "2025-12-16",
+                "DocDueDate": "2025-12-16",
+                "DocTotal": 6072000.0,
+                "DocEntry": 7840
+            },
+            "PurchaseDeliveryNotes/DocumentLines": {
+                "LineNum": 0,
+                "ItemCode": "BOM_Item_1",
+                "ItemDescription": "BOM_Item_Batch_1",
+                "WarehouseCode": "7000-FG",
+                "UnitsOfMeasurment": 1.0,
+                "DocEntry": 7840,
+                "LineTotal": 2023000.0,
+                "LineStatus": "O",
+                "Quantity": 1000.0,
+                "Price": 2023.0,
+                "PriceAfterVAT": 2023.0
+            }
+        },
+        {
+            "PurchaseDeliveryNotes": {
+                "CardCode": "3D SPL",
+                "CardName": "3D SEALS PRIVATE LIMITED",
+                "DocumentStatus": "O",
+                "DocNum": 123450102,
+                "Series": 241,
+                "DocDate": "2025-12-16",
+                "DocDueDate": "2025-12-16",
+                "DocTotal": 6072000.0,
+                "DocEntry": 7840
+            },
+            "PurchaseDeliveryNotes/DocumentLines": {
+                "LineNum": 1,
+                "ItemCode": "BOM_Item_2",
+                "ItemDescription": "BOM_Item_Batch_2",
+                "WarehouseCode": "7000-FG",
+                "UnitsOfMeasurment": 1.0,
+                "DocEntry": 7840,
+                "LineTotal": 2024000.0,
+                "LineStatus": "O",
+                "Quantity": 1000.0,
+                "Price": 2024.0,
+                "PriceAfterVAT": 2024.0
+            }
+        },
+        {
+            "PurchaseDeliveryNotes": {
+                "CardCode": "3D SPL",
+                "CardName": "3D SEALS PRIVATE LIMITED",
+                "DocumentStatus": "O",
+                "DocNum": 123450102,
+                "Series": 241,
+                "DocDate": "2025-12-16",
+                "DocDueDate": "2025-12-16",
+                "DocTotal": 6072000.0,
+                "DocEntry": 7840
+            },
+            "PurchaseDeliveryNotes/DocumentLines": {
+                "LineNum": 2,
+                "ItemCode": "BOM_Item_3",
+                "ItemDescription": "BOM_Item_Non_Manage_3",
+                "WarehouseCode": "7000-FG",
+                "UnitsOfMeasurment": 1.0,
+                "DocEntry": 7840,
+                "LineTotal": 2025000.0,
+                "LineStatus": "O",
+                "Quantity": 1000.0,
+                "Price": 2025.0,
+                "PriceAfterVAT": 2025.0
+            }
+        }
+    ]
+}
+Step 4:Above Response Same Document details Section repeated Each Lines So Save document Details One time Save Each Line Items in Separate and display also after I save and display 
+
+Quality Team Validate the Items and the they can Split the quantity Set the From Warehouse and TO Warehouse Make the ware House show me the DropDown list use the below URL:
+
+https://192.168.1.4:50000/b1s/v1/Warehouses?$select=WarehouseName,WarehouseCode
+Method: GET
+headers = {"Prefer": "odata.maxpagesize=0"}
+
+Response:
+{
+    "odata.metadata": "https://192.168.1.4:50000/b1s/v1/$metadata#Warehouses",
+    "value": [
+        {
+            "WarehouseCode": "01",
+            "WarehouseName": "MAINTENENCE Warehouse"
+        },
+        {
+            "WarehouseCode": "1002-FG",
+            "WarehouseName": "Finished Goods GST-AVS CHN"
+        },
+        {
+            "WarehouseCode": "1003-FG",
+            "WarehouseName": "Finished Goods GST-BDS CHN"
+        },
+        {
+            "WarehouseCode": "2002-RM",
+            "WarehouseName": "Raw Material-AVS CHN"
+        },
+        {
+            "WarehouseCode": "2003-RM",
+            "WarehouseName": "Raw Material-BDS CHN"
+        },
+        
+
+        {
+            "WarehouseCode": "QHG -AVS",
+            "WarehouseName": "Quality Hold Goods - AVS"
+        },
+        {
+            "WarehouseCode": "QHG -BDS",
+            "WarehouseName": "Quality Hold Goods - BDS"
+        },
+        {
+            "WarehouseCode": "REJ_AVS",
+            "WarehouseName": "REJECTION-AVS"
+        },
+        {
+            "WarehouseCode": "REJ_BDS",
+            "WarehouseName": "REJECTION BDS"
+        },
+        {
+            "WarehouseCode": "SCP_AVS",
+            "WarehouseName": "SCRAP-AVS"
+        },
+        {
+            "WarehouseCode": "SCP_BDS",
+            "WarehouseName": "SCRAP-BDS"
+        },
+        {
+            "WarehouseCode": "TOOL",
+            "WarehouseName": "Production tooling location BDS"
+        },
+        {
+            "WarehouseCode": "TOOLAVS",
+            "WarehouseName": "Production tooling location AVS"
+        },
+        {
+            "WarehouseCode": "WIP-AVS",
+            "WarehouseName": "WIP-AVS-Chennai"
+        },
+        {
+            "WarehouseCode": "WIP-BDS",
+            "WarehouseName": "WIP-BDS-Chennai"
+        }
+    ]
+}
+Step 5: Select the BinCode Dropdown List use choosed Above Warehouse code get  the Bincode list as dropdown list from warehouse code from bim bincode and towarhouse and to bincode. Use below URL:
+https://192.168.1.4:50000/b1s/v1/BinLocations?$select=AbsEntry,BinCode,Warehouse&$filter=Warehouse eq '7000-FG'
+Method:GET
+headers = {"Prefer": "odata.maxpagesize=0"}
+Response:
+{
+    "odata.metadata": "https://192.168.1.4:50000/b1s/v1/$metadata#BinLocations",
+    "value": [
+        {
+            "AbsEntry": 1,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-SYSTEM-BIN-LOCATION"
+        },
+        {
+            "AbsEntry": 2,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-A103"
+        },
+        {
+            "AbsEntry": 3,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-A71"
+        },
+        {
+            "AbsEntry": 4,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-830"
+        },
+        {
+            "AbsEntry": 5,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-840"
+        },
+        {
+            "AbsEntry": 6,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-850"
+        },
+        {
+            "AbsEntry": 7,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-860"
+        },
+        {
+            "AbsEntry": 8,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-870"
+        },
+        {
+            "AbsEntry": 9,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-880"
+        },
+        {
+            "AbsEntry": 10,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-890"
+        },
+        {
+            "AbsEntry": 11,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-900"
+        },
+        {
+            "AbsEntry": 12,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-910"
+        },
+        {
+            "AbsEntry": 13,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-920"
+        },
+        {
+            "AbsEntry": 14,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-A710"
+        },
+        {
+            "AbsEntry": 15,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-930"
+        },
+        {
+            "AbsEntry": 16,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-940"
+        },
+        {
+            "AbsEntry": 17,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-950"
+        },
+        {
+            "AbsEntry": 18,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-960"
+        },
+        {
+            "AbsEntry": 19,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-970"
+        },
+        {
+            "AbsEntry": 20,
+            "Warehouse": "7000-FG",
+            "BinCode": "7000-FG-J-980"
+        }
+    ],
+}
+
+Step 6: When the Quality team validate the quantity if Example 1000 quantity the Quality approve the 600 Quantity OK but the 400 Quantity is NOTOK Rejected the They choose the From Warehouse and frombin code and towarehouse also fromto Bincode also. Make this below JSON
+POST to SAP B1 .
+
+Before above activity I want to validate the Items Either it’s a BatchItem and NonBatch Items Using this URL:
+https://192.168.1.4:50000/b1s/v1/ SQLQueries('ItemCode_Batch_Serial_Val')/List
+Method:POST
+Body:
+{
+    "ParamList": "itemCode='BOM_Item_1'"
+}
+
+Response:
+{
+    "odata.metadata": "https://192.168.1.4:50000/b1s/v1/$metadata#SAPB1.SQLQueryResult",
+    "SqlText": "Select T0.[ItemCode],T0.[ItemName], ISNULL(T0.[ManBtchNum],'N') as [BatchNum] ,ISNULL(T0.[ManSerNum],'N') as [SerialNum],ISNULL(T0.[MngMethod],'N')  as [NonBatch_NonSerialMethod] FROM [OITM] T0 WHERE T0.[ItemCode]=:itemCode",
+    "value": [
+        {
+            "BatchNum": "Y",
+            "ItemCode": "BOM_Item_1",
+            "ItemName": "BOM_Item_Batch_1",
+            "NonBatch_NonSerialMethod": "A",
+            "SerialNum": "N"
+        }
+    ]
+}
+When the "BatchNum": "Y", thens it’s a Batch Item is the "SerialNum": "Y"then its an serial Item if the both the "SerialNum": "N" and "BatchNum": "N", then it’s a NonBatch Items.
+
+When the above Validatoion if the items is Batch Item then Get the BatchNumber Details using the This URL: using the Document choosed DocEntry
+
+https://192.168.1.4:50000/b1s/v1/SQLQueries('Get_Batches_By_DocEntry')/List
+Method:POST
+Body:
+{
+    "ParamList": "docEntry='7840'"
+}
+
+Repsosne:
+{
+    "odata.metadata": "https://192.168.1.4:50000/b1s/v1/$metadata#SAPB1.SQLQueryResult",
+    "SqlText": "SELECT T0.[DocEntry],T1.[LineNum],T1.[ItemCode],T2.[BatchNum],T2.[Quantity],T3.[ExpDate], T3.[MnfDate] FROM [OPDN] T0 INNER JOIN [PDN1] T1 ON T0.[DocEntry] = T1.[DocEntry] INNER JOIN [IBT1] T2 ON T2.[BaseType] = '20'  AND T2.[BaseEntry]  = T0.[DocEntry] AND T2.[BaseLinNum] = T1.[LineNum] AND T2.[ItemCode]   = T1.[ItemCode] INNER JOIN [OBTN] T3 ON T3.[ItemCode] = T2.[ItemCode] AND T3.[DistNumber] = T2.[BatchNum] WHERE T0.[DocEntry] = :docEntry",
+    "value": [
+        {
+            "BatchNum": "20251216-BOM_Item_1",
+            "DocEntry": 7840,
+            "ExpDate": "20270108",
+            "ItemCode": "BOM_Item_1",
+            "LineNum": 0,
+            "MnfDate": null,
+            "Quantity": 1000.0
+        },
+        {
+            "BatchNum": "20251216-BOM_Item_2",
+            "DocEntry": 7840,
+            "ExpDate": "20271219",
+            "ItemCode": "BOM_Item_2",
+            "LineNum": 1,
+            "MnfDate": null,
+            "Quantity": 1000.0
+        }
+    ]
+}
+This DocEntry two Items are Batch Items so that I can choose the Batch Numbers make dropdown list If the Item have two Batch numbers then automatically choose the Quantity batchnumbers. All the Ok Case Items We want ot make QR CODE Label  Same as like MultiGRN module.
+
+After all the above validation done We transfer the Items Using the Choosed warehouse from and to warehouse.
+
+
+
+
+https://192.168.1.4:50000/b1s/v1/StockTransfers
+Method:POST
+Body:
+{
+    "DocDate": "2025-12-01",
+    "Comments": "QC Approved WMS Transfer 15 by admin",
+    "FromWarehouse": "7000-FG",
+    "ToWarehouse": "7000-QFG",
+    "StockTransferLines": [
+        {
+            "LineNum": 0,
+            "ItemCode": "BatchItem_01",
+            "Quantity": 20.0,
+            "WarehouseCode": "7000-QFG",
+            "FromWarehouseCode": "7000-FG",
+            "BaseEntry": 33,
+            "BaseLine": 0,
+            "BaseType": "1250000001",
+            "BatchNumbers": [
+                {
+                    "BatchNumber": "20251129-BatchItem_-1",
+                    "Quantity": 20.0
+                }
+            ],
+            "StockTransferLinesBinAllocations": [
+                {
+                    "BinActionType": "batFromWarehouse",
+                    "BinAbsEntry": 251,
+                    "Quantity": 20.0,
+                    "SerialAndBatchNumbersBaseLine": 0
+                },
+                {
+                    "BinActionType": "batToWarehouse",
+                    "BinAbsEntry": 1393,
+                    "Quantity": 20.0,
+                    "SerialAndBatchNumbersBaseLine": 0
+                }
+            ]
+        },
+        {
+            "LineNum": 1,
+            "ItemCode": "BatchItem_02",
+            "Quantity": 20.0,
+            "WarehouseCode": "7000-QFG",
+            "FromWarehouseCode": "7000-FG",
+            "BaseEntry": 33,
+            "BaseLine": 1,
+            "BaseType": "1250000001",
+            "BatchNumbers": [
+                {
+                    "BatchNumber": "20251129-BatchItem_-1",
+                    "Quantity": 20.0
+                }
+            ],
+            "StockTransferLinesBinAllocations": [
+                {
+                    "BinActionType": "batFromWarehouse",
+                    "BinAbsEntry": 251,
+                    "Quantity": 20.0,
+                    "SerialAndBatchNumbersBaseLine": 0
+                },
+                {
+                    "BinActionType": "batToWarehouse",
+                    "BinAbsEntry": 1393,
+                    "Quantity": 20.0,
+                    "SerialAndBatchNumbersBaseLine": 0
+                }
+            ]
+        },
+        {
+            "LineNum": 2,
+            "ItemCode": "BatchItem_3",
+            "Quantity": 20.0,
+            "WarehouseCode": "7000-QFG",
+            "FromWarehouseCode": "7000-FG",
+            "BaseEntry": 33,
+            "BaseLine": 2,
+            "BaseType": "1250000001",
+            "BatchNumbers": [],
+            "StockTransferLinesBinAllocations": [
+                {
+                    "BinActionType": "batFromWarehouse",
+                    "BinAbsEntry": 251,
+                    "Quantity": 20.0,
+                    "SerialAndBatchNumbersBaseLine": 0
+                },
+                {
+                    "BinActionType": "batToWarehouse",
+                    "BinAbsEntry": 1393,
+                    "Quantity": 20.0,
+                    "SerialAndBatchNumbersBaseLine": 0
+                }
+            ]
+        }
+    ]
+}
+After the successfully posted then SAP B1 Response DocNumber and DocEntry save back to the WMS Application.

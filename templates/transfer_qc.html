@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block title %}Transfer Quality Check{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item active">Transfer Quality Check</li>
+                </ol>
+            </nav>
+            <h2 class="mb-4">Transfer Quality Check Module</h2>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Selection Criteria</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label for="seriesSelect" class="form-label">Series</label>
+                    <select id="seriesSelect" class="form-select">
+                        <option value="">Select Series</option>
+                    </select>
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label for="docNumSelect" class="form-label">GRPO Document Number</label>
+                    <select id="docNumSelect" class="form-select" disabled>
+                        <option value="">Select Document</option>
+                    </select>
+                </div>
+                <div class="col-md-4 mb-3 d-flex align-items-end">
+                    <button id="fetchDetailsBtn" class="btn btn-primary w-100" disabled>Fetch Details</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="documentDetailsContainer" style="display: none;">
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">GRPO Document Details</h5>
+            </div>
+            <div class="card-body" id="docHeaderInfo">
+                <!-- Header info injected here -->
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">Line Items & Quality Check</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-bordered mb-0" id="linesTable">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Item Code</th>
+                                <th>Description</th>
+                                <th>Original Qty</th>
+                                <th>Approved Qty</th>
+                                <th>Rejected Qty</th>
+                                <th>Batch/Serial</th>
+                                <th>From Whse/Bin</th>
+                                <th>To Whse/Bin</th>
+                            </tr>
+                        </thead>
+                        <tbody id="linesBody">
+                            <!-- Lines injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                <button id="submitQCBtn" class="btn btn-success btn-lg">Submit QC Transfer</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const seriesSelect = document.getElementById('seriesSelect');
+    const docNumSelect = document.getElementById('docNumSelect');
+    const fetchDetailsBtn = document.getElementById('fetchDetailsBtn');
+    const documentDetailsContainer = document.getElementById('documentDetailsContainer');
+    
+    let currentLines = [];
+    let warehouses = [];
+    let batches = [];
+
+    // 1. Fetch Series
+    fetch('/api/get-grpo-series')
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                data.series.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.SeriesID;
+                    opt.textContent = s.SeriesName;
+                    seriesSelect.appendChild(opt);
+                });
+            }
+        });
+
+    // 2. Fetch Warehouses
+    fetch('/api/get-warehouses')
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) warehouses = data.warehouses;
+        });
+
+    seriesSelect.addEventListener('change', function() {
+        if(!this.value) {
+            docNumSelect.disabled = true;
+            return;
+        }
+        docNumSelect.innerHTML = '<option value="">Loading...</option>';
+        fetch(`/api/get-grpo-docnums?seriesID=${this.value}`)
+            .then(res => res.json())
+            .then(data => {
+                docNumSelect.disabled = false;
+                docNumSelect.innerHTML = '<option value="">Select Document</option>';
+                if(data.success) {
+                    data.documents.forEach(doc => {
+                        const opt = document.createElement('option');
+                        opt.value = doc.DocEntry;
+                        opt.textContent = `${doc.DocNum} - ${doc.CardName}`;
+                        docNumSelect.appendChild(opt);
+                    });
+                }
+            });
+    });
+
+    docNumSelect.addEventListener('change', function() {
+        fetchDetailsBtn.disabled = !this.value;
+    });
+
+    fetchDetailsBtn.addEventListener('click', function() {
+        const docEntry = docNumSelect.value;
+        Promise.all([
+            fetch(`/api/get-grpo-details?docEntry=${docEntry}`).then(res => res.json()),
+            fetch(`/api/get-batches-by-docentry?docEntry=${docEntry}`).then(res => res.json())
+        ]).then(([detailsData, batchData]) => {
+            if(detailsData.success) {
+                batches = batchData.success ? batchData.value : [];
+                renderDetails(detailsData.value);
+            }
+        });
+    });
+
+    function renderDetails(data) {
+        if(!data || data.length === 0) return;
+        
+        const header = data[0].PurchaseDeliveryNotes;
+        document.getElementById('docHeaderInfo').innerHTML = `
+            <div class="row">
+                <div class="col-md-3"><strong>DocNum:</strong> ${header.DocNum}</div>
+                <div class="col-md-3"><strong>Supplier:</strong> ${header.CardName}</div>
+                <div class="col-md-3"><strong>DocDate:</strong> ${header.DocDate}</div>
+                <div class="col-md-3"><strong>Total:</strong> ${header.DocTotal}</div>
+            </div>
+        `;
+
+        const linesBody = document.getElementById('linesBody');
+        linesBody.innerHTML = '';
+        currentLines = data.map(item => item['PurchaseDeliveryNotes/DocumentLines']);
+
+        currentLines.forEach((line, index) => {
+            const tr = document.createElement('tr');
+            
+            // Filter batches for this item
+            const itemBatches = batches.filter(b => b.ItemCode === line.ItemCode && b.LineNum === line.LineNum);
+            const batchOptions = itemBatches.map(b => `<option value="${b.BatchNum}">${b.BatchNum} (${b.Quantity})</option>`).join('');
+
+            tr.innerHTML = `
+                <td>${line.ItemCode}</td>
+                <td>${line.ItemDescription}</td>
+                <td>${line.Quantity}</td>
+                <td><input type="number" class="form-control qty-ok" value="${line.Quantity}" max="${line.Quantity}" data-index="${index}"></td>
+                <td><input type="number" class="form-control qty-rej" value="0" max="${line.Quantity}" data-index="${index}"></td>
+                <td>
+                    <select class="form-select batch-select" ${itemBatches.length ? '' : 'disabled'}>
+                        <option value="">${itemBatches.length ? 'Select Batch' : 'No Batch'}</option>
+                        ${batchOptions}
+                    </select>
+                </td>
+                <td>
+                    <select class="form-select from-whse" data-index="${index}">
+                        ${warehouses.map(w => `<option value="${w.WarehouseCode}" ${w.WarehouseCode === line.WarehouseCode ? 'selected' : ''}>${w.WarehouseCode}</option>`).join('')}
+                    </select>
+                    <select class="form-select from-bin mt-1" data-index="${index}"><option value="">Select Bin</option></select>
+                </td>
+                <td>
+                    <select class="form-select to-whse" data-index="${index}">
+                        <option value="">Select To Whse</option>
+                        ${warehouses.map(w => `<option value="${w.WarehouseCode}">${w.WarehouseCode}</option>`).join('')}
+                    </select>
+                    <select class="form-select to-bin mt-1" data-index="${index}"><option value="">Select Bin</option></select>
+                </td>
+            `;
+            linesBody.appendChild(tr);
+            
+            // Trigger bin load for current warehouse
+            loadBins(line.WarehouseCode, tr.querySelector('.from-bin'));
+        });
+
+        documentDetailsContainer.style.display = 'block';
+    }
+
+    function loadBins(whseCode, selectElem) {
+        if(!whseCode) return;
+        fetch(`/api/get-bins?warehouse=${whseCode}`)
+            .then(res => res.json())
+            .then(data => {
+                selectElem.innerHTML = '<option value="">Select Bin</option>';
+                if(data.success) {
+                    data.bins.forEach(b => {
+                        const opt = document.createElement('option');
+                        opt.value = b.BinAbsEntry || b.AbsEntry;
+                        opt.textContent = b.BinCode;
+                        selectElem.appendChild(opt);
+                    });
+                }
+            });
+    }
+
+    document.addEventListener('change', function(e) {
+        if(e.target.classList.contains('from-whse')) {
+            loadBins(e.target.value, e.target.parentElement.querySelector('.from-bin'));
+        }
+        if(e.target.classList.contains('to-whse')) {
+            loadBins(e.target.value, e.target.parentElement.querySelector('.to-bin'));
+        }
+    });
+
+    document.getElementById('submitQCBtn').addEventListener('click', function() {
+        const payload = {
+            DocDate: new Date().toISOString().split('T')[0],
+            Comments: "QC Approved WMS Transfer",
+            StockTransferLines: []
+        };
+
+        const rows = document.querySelectorAll('#linesBody tr');
+        rows.forEach((row, i) => {
+            const line = currentLines[i];
+            const okQty = parseFloat(row.querySelector('.qty-ok').value);
+            const fromWhse = row.querySelector('.from-whse').value;
+            const toWhse = row.querySelector('.to-whse').value;
+            const fromBin = row.querySelector('.from-bin').value;
+            const toBin = row.querySelector('.to-bin').value;
+            const batch = row.querySelector('.batch-select').value;
+
+            if(okQty > 0) {
+                const transferLine = {
+                    ItemCode: line.ItemCode,
+                    Quantity: okQty,
+                    WarehouseCode: toWhse,
+                    FromWarehouseCode: fromWhse,
+                    BaseEntry: line.DocEntry,
+                    BaseLine: line.LineNum,
+                    BaseType: "1250000001",
+                    BatchNumbers: batch ? [{ BatchNumber: batch, Quantity: okQty }] : [],
+                    StockTransferLinesBinAllocations: []
+                };
+
+                if(fromBin) transferLine.StockTransferLinesBinAllocations.push({ BinActionType: "batFromWarehouse", BinAbsEntry: parseInt(fromBin), Quantity: okQty });
+                if(toBin) transferLine.StockTransferLinesBinAllocations.push({ BinActionType: "batToWarehouse", BinAbsEntry: parseInt(toBin), Quantity: okQty });
+                
+                payload.StockTransferLines.push(transferLine);
+            }
+        });
+
+        if(payload.StockTransferLines.length === 0) {
+            alert("No items approved for transfer");
+            return;
+        }
+
+        fetch('/api/post-transfer-qc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    alert("Transfer created successfully!");
+                    location.reload();
+                } else {
+                    alert("Error: " + data.error);
+                }
+            });
+    });
+});
+</script>
+{% endblock %}
