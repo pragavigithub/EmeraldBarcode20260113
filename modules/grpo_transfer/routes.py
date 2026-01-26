@@ -666,6 +666,7 @@ def get_warehouses():
 # ============================================================================
 
 @grpo_transfer_bp.route('/api/bin-codes/<warehouse_code>', methods=['GET'])
+@grpo_transfer_bp.route('/api/bin-locations/<warehouse_code>', methods=['GET'])
 @login_required
 def get_bin_codes(warehouse_code):
     """Get bin codes for selected warehouse"""

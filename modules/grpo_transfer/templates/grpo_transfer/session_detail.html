@@ -724,7 +724,7 @@ function renderItemEditForm(item) {
     
     // Add change listener for warehouse to load bins
     document.getElementById('editToWarehouse').addEventListener('change', function() {
-        loadBinCodesForEdit(this.value, item.to_bin_code);
+        loadBinCodesForEdit(this.value, null);
     });
 }
 
@@ -793,8 +793,10 @@ function saveItem() {
     const notes = document.getElementById('editNotes').value;
     
     const saveBtn = document.getElementById('saveItemBtn');
-    saveBtn.disabled = true;
-    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+    }
     
     fetch(`/grpo-transfer/api/item/${currentEditItemId}`, {
         method: 'PUT',
@@ -810,13 +812,16 @@ function saveItem() {
     })
     .then(response => response.json())
     .then(data => {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = 'Save Changes';
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = 'Save Changes';
+        }
         
         if (data.success) {
             alert('Item updated successfully!');
             // Close modal and refresh page
-            const modal = bootstrap.Modal.getInstance(document.getElementById('itemEditModal'));
+            const modalEl = document.getElementById('itemEditModal');
+            const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
             modal.hide();
             location.reload();
         } else {
@@ -824,8 +829,10 @@ function saveItem() {
         }
     })
     .catch(error => {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = 'Save Changes';
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = 'Save Changes';
+        }
         console.error('Error:', error);
         alert('Error saving item: ' + error.message);
     });
